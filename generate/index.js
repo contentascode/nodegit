@@ -10,9 +10,11 @@ module.exports = function generate() {
     .then(function(statuses) {
       var dirtySubmodules = statuses
         .filter(function(status) {
+          // For explanaition why libssh2 is special see comment in
+          // lifecycleScrpts/submodules/index.js
           return status.onNewCommit
             || status.needsInitialization
-            || status.workDirDirty;
+            || (status.workDirDirty && status.name != "vendor/libssh2")
         });
 
       if (dirtySubmodules.length) {

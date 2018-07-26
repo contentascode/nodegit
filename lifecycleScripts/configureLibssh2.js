@@ -22,9 +22,9 @@ module.exports = function retrieveExternalDependencies() {
     newEnv.CPPFLAGS += " -I" + path.join(opensslDir, "include");
     newEnv.CPPFLAGS = newEnv.CPPFLAGS.trim();
 
+    // First buildconf
     cp.exec(
-      rooted("vendor/libssh2/configure") +
-        " --with-libssl-prefix=" + opensslDir,
+      rooted("vendor/libssh2/buildconf"),
       {cwd: rooted("vendor/libssh2/"), env: newEnv},
       function(err, stdout, stderr) {
         if (err) {
@@ -33,10 +33,26 @@ module.exports = function retrieveExternalDependencies() {
           reject(err, stderr);
         }
         else {
-          resolve(stdout);
+            // Now configure libshh2
+            cp.exec(
+              rooted("vendor/libssh2/configure") +
+                " --with-libssl-prefix=" + opensslDir,
+              {cwd: rooted("vendor/libssh2/"), env: newEnv},
+              function(err, stdout, stderr) {
+                if (err) {
+                  console.error(err);
+                  console.error(stderr);
+                  reject(err, stderr);
+                }
+                else {
+                  resolve(stdout);
+                }
+              }
+            );
         }
       }
     );
+
   });
 };
 

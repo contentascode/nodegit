@@ -27,11 +27,21 @@ module.exports = function submodules() {
 
       var dirtySubmodules = statuses
       .filter(function(status) {
-        return status.workDirDirty && !status.needsInitialization;
+        // Todo: We are ignoring vendor/libssh2 as it
+        // needs configuration on Linux
+        // There might be more smoother ways to do this,
+        // e.g. expending the offial libssh2 .gitignore
+        // or configuration or building in another directory
+        // At this point of time, having this workaround is likely still better
+        // than including the entire libssh2 project manually (urgh!)
+        return status.workDirDirty &&
+        !status.needsInitialization &&
+        status.name != "vendor/libssh2";
       })
       .map(function(dirtySubmodule) {
         return dirtySubmodule.name;
       });
+
 
       if (dirtySubmodules.length) {
         console.error(
