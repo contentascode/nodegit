@@ -1,4 +1,5 @@
-sudo: false
+sudo: true
+dist: xenial
 
 branches:
   only:
@@ -48,8 +49,6 @@ git:
 
 addons:
   apt:
-    sources:
-      - ubuntu-toolchain-r-test
     packages:
       - build-essential
       - libssl-dev
