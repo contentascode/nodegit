@@ -7,3 +7,6 @@
 [submodule "vendor/openssl/openssl"]
 	path = vendor/openssl/openssl
 	url = https://github.com/openssl/openssl
+[submodule "vendor/http_parser"]
+	path = vendor/http_parser
+	url = https://github.com/nodejs/http-parser
