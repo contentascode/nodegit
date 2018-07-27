@@ -103,11 +103,8 @@ describe("Filter", function() {
   describe("Register", function() {
     var secondFilter = "hellofilter";
 
-    after(function(done) {
-      return Registry.unregister(secondFilter)
-        .then(function() {
-          done();
-        });
+    after((done) => {
+        Registry.unregister(secondFilter).then(done);
     });
 
     it("can register a filter", function() {
