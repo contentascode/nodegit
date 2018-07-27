@@ -1,10 +1,5 @@
 sudo: false
 
-branches:
-  only:
-    - master
-    - /^v\d+\.\d+\.\d+$/
-
 compiler: clang
 language: node_js
 
