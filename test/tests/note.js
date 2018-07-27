@@ -52,20 +52,19 @@ describe("Note", function() {
     });
   });
 
-  it("can be removed", function(done) {
+  it("can be removed", function() {
     var test = this;
     var sha = this.commit.id();
     var noteRef = "refs/notes/commits";
     var sig = Signature.create("John", "john@doe.com", Date.now(), 0);
+    var result = "I still can read the repository";
 
     return Note.create(this.repository, noteRef, sig, sig, sha, "Testing!", 1)
       .then((noteSha) => Note.remove(this.repository, noteRef, sig, sig, sha))
-      .then(function() {
-        return Note.read(test.repository, noteRef, sha).catch(function(ex) {
-          assert.equal(ex.message, "note could not be found");
-          done();
-        });
-      })
-      .catch(done);
+      .then(() => Note.read(test.repository, noteRef, sha))
+      .catch((ex) => {
+          result = ex.message;
+        })
+      .then(() => { assert.equal(result, "note could not be found"); });
   });
 });
