@@ -19,15 +19,15 @@
     {%endif%}
   {%if cppClassName == 'String'%}
 
-  String::Utf8Value {{ name }}(info[{{ jsArg }}]->ToString());
+  Napi::String {{ name }}(env, info[{{ jsArg }}]->ToString());
   // malloc with one extra byte so we can add the terminating null character C-strings expect:
-  from_{{ name }} = ({{ cType }}) malloc({{ name }}.length() + 1);
+  from_{{ name }} = ({{ cType }}) malloc({{ name }}.Length() + 1);
   // copy the characters from the nodejs string into our C-string (used instead of strdup or strcpy because nulls in
   // the middle of strings are valid coming from nodejs):
-  memcpy((void *)from_{{ name }}, *{{ name }}, {{ name }}.length());
+  memcpy((void *)from_{{ name }}, *{{ name }}, {{ name }}.Length());
   // ensure the final byte of our new string is null, extra casts added to ensure compatibility with various C types
   // used in the nodejs binding generation:
-  memset((void *)(((char *)from_{{ name }}) + {{ name }}.length()), 0, 1);
+  memset((void *)(((char *)from_{{ name }}) + {{ name }}.Length()), 0, 1);
   {%elsif cppClassName == 'GitStrarray' %}
 
   from_{{ name }} = StrArrayConverter::Convert(info[{{ jsArg }}]);
@@ -36,24 +36,24 @@
   from_{{ name }} = GitBufConverter::Convert(info[{{ jsArg }}]);
   {%elsif cppClassName == 'Wrapper'%}
 
-  String::Utf8Value {{ name }}(info[{{ jsArg }}]->ToString());
+  Napi::String {{ name }}(env, info[{{ jsArg }}]->ToString());
   // malloc with one extra byte so we can add the terminating null character C-strings expect:
-  from_{{ name }} = ({{ cType }}) malloc({{ name }}.length() + 1);
+  from_{{ name }} = ({{ cType }}) malloc({{ name }}.Length() + 1);
   // copy the characters from the nodejs string into our C-string (used instead of strdup or strcpy because nulls in
   // the middle of strings are valid coming from nodejs):
-  memcpy((void *)from_{{ name }}, *{{ name }}, {{ name }}.length());
+  memcpy((void *)from_{{ name }}, *{{ name }}, {{ name }}.Length());
   // ensure the final byte of our new string is null, extra casts added to ensure compatibility with various C types
   // used in the nodejs binding generation:
-  memset((void *)(((char *)from_{{ name }}) + {{ name }}.length()), 0, 1);
+  memset((void *)(((char *)from_{{ name }}) + {{ name }}.Length()), 0, 1);
   {%elsif cppClassName == 'Array'%}
 
-  Array *tmp_{{ name }} = Array::Cast(*info[{{ jsArg }}]);
+  Array *tmp_{{ name }} = *info[{{ jsArg }}].As<Napi::Array>();
   from_{{ name }} = ({{ cType }})malloc(tmp_{{ name }}->Length() * sizeof({{ cType|replace '**' '*' }}));
       for (unsigned int i = 0; i < tmp_{{ name }}->Length(); i++) {
     {%--
       // FIXME: should recursively call convertFromv8.
     --%}
-      from_{{ name }}[i] = Nan::ObjectWrap::Unwrap<{{ arrayElementCppClassName }}>(tmp_{{ name }}->Get(Nan::New(static_cast<double>(i)))->ToObject())->GetValue();
+      from_{{ name }}[i] = Napi::ObjectWrap::Unwrap<{{ arrayElementCppClassName }}>(tmp_{{ name }}->Get(Napi::New(env, static_cast<double>(i)))->ToObject())->GetValue();
       }
   {%elsif cppClassName == 'Function'%}
   {%elsif cppClassName == 'Buffer'%}
@@ -67,18 +67,20 @@
       from_{{ name }} = ({{ cType }}) {{ cast }} {%if isEnum %}(int){%endif%} info[{{ jsArg }}].As<v8::{{ cppClassName }}>()->Value();
     {%endif%}
   {%elsif cppClassName == 'GitOid'%}
-  if (info[{{ jsArg }}]->IsString()) {
+  if (info[{{ jsArg }}].IsString()) {
     // Try and parse in a string to a git_oid
-    String::Utf8Value oidString(info[{{ jsArg }}]->ToString());
+    Napi::String oidString(env, info[{{ jsArg }}]->ToString());
     git_oid *oidOut = (git_oid *)malloc(sizeof(git_oid));
 
     if (git_oid_fromstr(oidOut, (const char *) strdup(*oidString)) != GIT_OK) {
       free(oidOut);
 
       if (giterr_last()) {
-        return Nan::ThrowError(giterr_last()->message);
+        Napi::Error::New(env, giterr_last()->message).ThrowAsJavaScriptException();
+        return env.Null();
       } else {
-        return Nan::ThrowError("Unknown Error");
+        Napi::Error::New(env, "Unknown Error").ThrowAsJavaScriptException();
+        return env.Null();
       }
     }
 
@@ -89,10 +91,10 @@
     {%endif%}
   }
   else {
-    {%if cType|isDoublePointer %}*{%endif%}from_{{ name }} = Nan::ObjectWrap::Unwrap<{{ cppClassName }}>(info[{{ jsArg }}]->ToObject())->GetValue();
+    {%if cType|isDoublePointer %}*{%endif%}from_{{ name }} = Napi::ObjectWrap::Unwrap<{{ cppClassName }}>(info[{{ jsArg }}]->ToObject())->GetValue();
   }
   {%else%}
-    {%if cType|isDoublePointer %}*{%endif%}from_{{ name }} = Nan::ObjectWrap::Unwrap<{{ cppClassName }}>(info[{{ jsArg }}]->ToObject())->GetValue();
+    {%if cType|isDoublePointer %}*{%endif%}from_{{ name }} = Napi::ObjectWrap::Unwrap<{{ cppClassName }}>(info[{{ jsArg }}]->ToObject())->GetValue();
   {%endif%}
 
   {%if isBoolean %}

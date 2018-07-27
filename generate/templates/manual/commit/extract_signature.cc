@@ -1,24 +1,29 @@
-NAN_METHOD(GitCommit::ExtractSignature)
+Napi::Value GitCommit::ExtractSignature(const Napi::CallbackInfo& info)
 {
-  if (info.Length() == 0 || !info[0]->IsObject()) {
-    return Nan::ThrowError("Repository repo is required.");
+  if (info.Length() == 0 || !info[0].IsObject()) {
+    Napi::Error::New(env, "Repository repo is required.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  if (info.Length() == 1 || (!info[1]->IsObject() && !info[1]->IsString())) {
-    return Nan::ThrowError("Oid commit_id is required.");
+  if (info.Length() == 1 || (!info[1].IsObject() && !info[1].IsString())) {
+    Napi::Error::New(env, "Oid commit_id is required.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  if (info.Length() == 2 || (info.Length() == 3 && !info[2]->IsFunction())) {
-    return Nan::ThrowError("Callback is required and must be a Function.");
+  if (info.Length() == 2 || (info.Length() == 3 && !info[2].IsFunction())) {
+    Napi::Error::New(env, "Callback is required and must be a Function.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   if (info.Length() >= 4) {
-    if (!info[2]->IsString() && !info[2]->IsUndefined() && !info[2]->IsNull()) {
-      return Nan::ThrowError("String signature_field must be a string or undefined/null.");
+    if (!info[2].IsString() && !info[2].IsUndefined() && !info[2].IsNull()) {
+      Napi::Error::New(env, "String signature_field must be a string or undefined/null.").ThrowAsJavaScriptException();
+      return env.Null();
     }
 
-    if (!info[3]->IsFunction()) {
-      return Nan::ThrowError("Callback is required and must be a Function.");
+    if (!info[3].IsFunction()) {
+      Napi::Error::New(env, "Callback is required and must be a Function.").ThrowAsJavaScriptException();
+      return env.Null();
     }
   }
 
@@ -28,46 +33,48 @@ NAN_METHOD(GitCommit::ExtractSignature)
   baton->error = NULL;
   baton->signature = GIT_BUF_INIT_CONST(NULL, 0);
   baton->signed_data = GIT_BUF_INIT_CONST(NULL, 0);
-  baton->repo = Nan::ObjectWrap::Unwrap<GitRepository>(info[0]->ToObject())->GetValue();
+  baton->repo = info[0].ToObject())->GetValue(.Unwrap<GitRepository>();
 
   // baton->commit_id
-  if (info[1]->IsString()) {
-    String::Utf8Value oidString(info[1]->ToString());
+  if (info[1].IsString()) {
+    Napi::String oidString(env, info[1].ToString());
     baton->commit_id = (git_oid *)malloc(sizeof(git_oid));
     if (git_oid_fromstr(baton->commit_id, (const char *)strdup(*oidString)) != GIT_OK) {
       free(baton->commit_id);
 
       if (giterr_last()) {
-        return Nan::ThrowError(giterr_last()->message);
+        Napi::Error::New(env, giterr_last()->message).ThrowAsJavaScriptException();
+        return env.Null();
       } else {
-        return Nan::ThrowError("Unknown Error");
+        Napi::Error::New(env, "Unknown Error").ThrowAsJavaScriptException();
+        return env.Null();
       }
     }
   } else {
-    baton->commit_id = Nan::ObjectWrap::Unwrap<GitOid>(info[1]->ToObject())->GetValue();
+    baton->commit_id = info[1].ToObject())->GetValue(.Unwrap<GitOid>();
   }
 
   // baton->field
-  if (info[2]->IsString()) {
-    String::Utf8Value field(info[2]->ToString());
-    baton->field = (char *)malloc(field.length() + 1);
-    memcpy((void *)baton->field, *field, field.length());
-    baton->field[field.length()] = 0;
+  if (info[2].IsString()) {
+    Napi::String field(env, info[2].ToString());
+    baton->field = (char *)malloc(field.Length() + 1);
+    memcpy((void *)baton->field, *field, field.Length());
+    baton->field[field.Length()] = 0;
   } else {
     baton->field = NULL;
   }
 
-  Nan::Callback *callback;
-  if (info[2]->IsFunction()) {
-    callback = new Nan::Callback(Local<Function>::Cast(info[2]));
+  Napi::FunctionReference *callback;
+  if (info[2].IsFunction()) {
+    callback = new Napi::FunctionReference(info[2].As<Napi::Function>());
   } else {
-    callback = new Nan::Callback(Local<Function>::Cast(info[3]));
+    callback = new Napi::FunctionReference(info[3].As<Napi::Function>());
   }
 
   ExtractSignatureWorker *worker = new ExtractSignatureWorker(baton, callback);
-  worker->SaveToPersistent("repo", info[0]->ToObject());
-  worker->SaveToPersistent("commit_id", info[1]->ToObject());
-  Nan::AsyncQueueWorker(worker);
+  worker->SaveToPersistent("repo", info[0].ToObject());
+  worker->SaveToPersistent("commit_id", info[1].ToObject());
+  worker.Queue();
   return;
 }
 
@@ -95,24 +102,22 @@ void GitCommit::ExtractSignatureWorker::Execute()
   }
 }
 
-void GitCommit::ExtractSignatureWorker::HandleOKCallback()
+void GitCommit::ExtractSignatureWorker::OnOK()
 {
   if (baton->error_code == GIT_OK)
   {
-    Local<v8::Object> result = Nan::New<Object>();
-    Nan::Set(
-      result,
-      Nan::New("signature").ToLocalChecked(),
-      Nan::New<String>(baton->signature.ptr, baton->signature.size).ToLocalChecked()
+    Local<v8::Object> result = Napi::Object::New(env);
+    (
+      result).Set(Napi::String::New(env, "signature"),
+      Napi::String::New(env, baton->signature.ptr, baton->signature.size)
     );
-    Nan::Set(
-      result,
-      Nan::New("signedData").ToLocalChecked(),
-      Nan::New<String>(baton->signed_data.ptr, baton->signed_data.size).ToLocalChecked()
+    (
+      result).Set(Napi::String::New(env, "signedData"),
+      Napi::String::New(env, baton->signed_data.ptr, baton->signed_data.size)
     );
 
     Local<v8::Value> argv[2] = {
-      Nan::Null(),
+      env.Null(),
       result
     };
     callback->Call(2, argv, async_resource);
@@ -120,7 +125,7 @@ void GitCommit::ExtractSignatureWorker::HandleOKCallback()
   else if (baton->error)
   {
     Local<v8::Value> argv[1] = {
-      Nan::Error(baton->error->message)
+      Napi::Error::New(env, baton->error->message)
     };
     callback->Call(1, argv, async_resource);
     if (baton->error->message)
@@ -132,9 +137,9 @@ void GitCommit::ExtractSignatureWorker::HandleOKCallback()
   }
   else if (baton->error_code < 0)
   {
-    Local<v8::Object> err = Nan::Error("Extract Signature has thrown an error.")->ToObject();
-    err->Set(Nan::New("errno").ToLocalChecked(), Nan::New(baton->error_code));
-    err->Set(Nan::New("errorFunction").ToLocalChecked(), Nan::New("Commit.extractSignature").ToLocalChecked());
+    Local<v8::Object> err = Napi::Error::New(env, "Extract Signature has thrown an error.")->ToObject();
+    err.Set(Napi::String::New(env, "errno"), Napi::New(env, baton->error_code));
+    err.Set(Napi::String::New(env, "errorFunction"), Napi::String::New(env, "Commit.extractSignature"));
     Local<v8::Value> argv[1] = {
       err
     };

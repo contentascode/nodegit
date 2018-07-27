@@ -3,7 +3,8 @@
 NAN_METHOD({{ cppClassName }}::{{ cppFunctionName }}) {
   {%partial guardArguments .%}
   if (info.Length() == {{args|jsArgsCount}} || !info[{{args|jsArgsCount}}]->IsFunction()) {
-    return Nan::ThrowError("Callback is required and must be a Function.");
+    Napi::Error::New(env, "Callback is required and must be a Function.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   {{ cppFunctionName }}Baton* baton = new {{ cppFunctionName }}Baton;
@@ -20,7 +21,7 @@ NAN_METHOD({{ cppClassName }}::{{ cppFunctionName }}) {
   {%each args|argsInfo as arg %}
     {%if not arg.isReturn %}
       {%if arg.isSelf %}
-  baton->{{ arg.name }} = Nan::ObjectWrap::Unwrap<{{ arg.cppClassName }}>(info.This())->GetValue();
+  baton->{{ arg.name }} = Napi::ObjectWrap::Unwrap<{{ arg.cppClassName }}>(info.This())->GetValue();
       {%elsif arg.isCallbackFunction %}
   if (!info[{{ arg.jsArg }}]->IsFunction()) {
     baton->{{ arg.name }} = NULL;
@@ -33,9 +34,9 @@ NAN_METHOD({{ cppClassName }}::{{ cppFunctionName }}) {
   else {
     baton->{{ arg.name}} = {{ cppFunctionName }}_{{ arg.name }}_cppCallback;
         {%if arg.payload.globalPayload %}
-    globalPayload->{{ arg.name }} = new Nan::Callback(info[{{ arg.jsArg }}].As<Function>());
+    globalPayload->{{ arg.name }} = new Napi::FunctionReference(info[{{ arg.jsArg }}].As<Napi::Function>());
         {%else%}
-    baton->{{ arg.payload.name }} = new Nan::Callback(info[{{ arg.jsArg }}].As<Function>());
+    baton->{{ arg.payload.name }} = new Napi::FunctionReference(info[{{ arg.jsArg }}].As<Napi::Function>());
         {%endif%}
   }
       {%elsif arg.payloadFor %}
@@ -47,7 +48,7 @@ NAN_METHOD({{ cppClassName }}::{{ cppFunctionName }}) {
         {%if not arg.payloadFor %}
   baton->{{ arg.name }} = from_{{ arg.name }};
           {%if arg | isOid %}
-  baton->{{ arg.name }}NeedsFree = info[{{ arg.jsArg }}]->IsString();
+  baton->{{ arg.name }}NeedsFree = info[{{ arg.jsArg }}].IsString();
           {%endif%}
         {%endif%}
       {%endif%}
@@ -60,7 +61,7 @@ NAN_METHOD({{ cppClassName }}::{{ cppFunctionName }}) {
     {%endif%}
   {%endeach%}
 
-  Nan::Callback *callback = new Nan::Callback(v8::Local<Function>::Cast(info[{{args|jsArgsCount}}]));
+  Napi::FunctionReference *callback = new Napi::FunctionReference(info[{{args|jsArgsCount}}].As<v8::Napi::Function>());
   {{ cppFunctionName }}Worker *worker = new {{ cppFunctionName }}Worker(baton, callback);
   {%each args|argsInfo as arg %}
     {%if not arg.isReturn %}
@@ -121,48 +122,48 @@ void {{ cppClassName }}::{{ cppFunctionName }}Worker::Execute() {
   }
 }
 
-void {{ cppClassName }}::{{ cppFunctionName }}Worker::HandleOKCallback() {
+void {{ cppClassName }}::{{ cppFunctionName }}Worker::OnOK() {
   {%if return.isResultOrError %}
   if (baton->error_code >= GIT_OK) {
   {%else%}
   if (baton->error_code == GIT_OK) {
   {%endif%}
     {%if return.isResultOrError %}
-    v8::Local<v8::Value> result = Nan::New<v8::Number>(baton->error_code);
+    Napi::Value result = Napi::Number::New(env, baton->error_code);
 
     {%elsif not .|returnsCount %}
-    v8::Local<v8::Value> result = Nan::Undefined();
+    Napi::Value result = env.Undefined();
     {%else%}
-    v8::Local<v8::Value> to;
+    Napi::Value to;
       {%if .|returnsCount > 1 %}
-    v8::Local<Object> result = Nan::New<Object>();
+    v8::Napi::Object result = Napi::Object::New(env);
       {%endif%}
       {%each .|returnsInfo 0 1 as _return %}
         {%partial convertToV8 _return %}
         {%if .|returnsCount > 1 %}
-    Nan::Set(result, Nan::New("{{ _return.returnNameOrName }}").ToLocalChecked(), to);
+    (result).Set(Napi::String::New(env, "{{ _return.returnNameOrName }}"), to);
         {%endif%}
       {%endeach%}
       {%if .|returnsCount == 1 %}
-    v8::Local<v8::Value> result = to;
+    Napi::Value result = to;
       {%endif%}
     {%endif%}
-    v8::Local<v8::Value> argv[2] = {
-      Nan::Null(),
+    Napi::Value argv[2] = {
+      env.Null(),
       result
     };
     callback->Call(2, argv, async_resource);
   } else {
     if (baton->error) {
-      v8::Local<v8::Object> err;
+      Napi::Object err;
       if (baton->error->message) {
-        err = Nan::Error(baton->error->message)->ToObject();
+        err = Napi::Error::New(env, baton->error->message)->ToObject();
       } else {
-        err = Nan::Error("Method {{ jsFunctionName }} has thrown an error.")->ToObject();
+        err = Napi::Error::New(env, "Method {{ jsFunctionName }} has thrown an error.")->ToObject();
       }
-      err->Set(Nan::New("errno").ToLocalChecked(), Nan::New(baton->error_code));
-      err->Set(Nan::New("errorFunction").ToLocalChecked(), Nan::New("{{ jsClassName }}.{{ jsFunctionName }}").ToLocalChecked());
-      v8::Local<v8::Value> argv[1] = {
+      err.Set(Napi::String::New(env, "errno"), Napi::New(env, baton->error_code));
+      err.Set(Napi::String::New(env, "errorFunction"), Napi::String::New(env, "{{ jsClassName }}.{{ jsFunctionName }}"));
+      Napi::Value argv[1] = {
         err
       };
       callback->Call(1, argv, async_resource);
@@ -170,7 +171,7 @@ void {{ cppClassName }}::{{ cppFunctionName }}Worker::HandleOKCallback() {
         free((void *)baton->error->message);
       free((void *)baton->error);
     } else if (baton->error_code < 0) {
-      std::queue< v8::Local<v8::Value> > workerArguments;
+      std::queue< Napi::Value > workerArguments;
 {%each args|argsInfo as arg %}
   {%if not arg.isReturn %}
     {%if not arg.isSelf %}
@@ -182,11 +183,11 @@ void {{ cppClassName }}::{{ cppFunctionName }}Worker::HandleOKCallback() {
 {%endeach%}
       bool callbackFired = false;
       while(!workerArguments.empty()) {
-        v8::Local<v8::Value> node = workerArguments.front();
+        Napi::Value node = workerArguments.front();
         workerArguments.pop();
 
         if (
-          !node->IsObject()
+          !node.IsObject()
           || node->IsArray()
           || node->IsBooleanObject()
           || node->IsDate()
@@ -198,11 +199,11 @@ void {{ cppClassName }}::{{ cppFunctionName }}Worker::HandleOKCallback() {
           continue;
         }
 
-        v8::Local<v8::Object> nodeObj = node->ToObject();
-        v8::Local<v8::Value> checkValue = GetPrivate(nodeObj, Nan::New("NodeGitPromiseError").ToLocalChecked());
+        Napi::Object nodeObj = node->ToObject();
+        Napi::Value checkValue = GetPrivate(nodeObj, Napi::String::New(env, "NodeGitPromiseError"));
 
         if (!checkValue.IsEmpty() && !checkValue->IsNull() && !checkValue->IsUndefined()) {
-          v8::Local<v8::Value> argv[1] = {
+          Napi::Value argv[1] = {
             checkValue->ToObject()
           };
           callback->Call(1, argv, async_resource);
@@ -210,10 +211,10 @@ void {{ cppClassName }}::{{ cppFunctionName }}Worker::HandleOKCallback() {
           break;
         }
 
-        v8::Local<v8::Array> properties = nodeObj->GetPropertyNames();
+        Napi::Array properties = nodeObj->GetPropertyNames();
         for (unsigned int propIndex = 0; propIndex < properties->Length(); ++propIndex) {
-          v8::Local<v8::String> propName = properties->Get(propIndex)->ToString();
-          v8::Local<v8::Value> nodeToQueue = nodeObj->Get(propName);
+          Napi::String propName = properties->Get(propIndex)->ToString();
+          Napi::Value nodeToQueue = nodeObj->Get(propName);
           if (!nodeToQueue->IsUndefined()) {
             workerArguments.push(nodeToQueue);
           }
@@ -221,10 +222,10 @@ void {{ cppClassName }}::{{ cppFunctionName }}Worker::HandleOKCallback() {
       }
 
       if (!callbackFired) {
-        v8::Local<v8::Object> err = Nan::Error("Method {{ jsFunctionName }} has thrown an error.")->ToObject();
-        err->Set(Nan::New("errno").ToLocalChecked(), Nan::New(baton->error_code));
-        err->Set(Nan::New("errorFunction").ToLocalChecked(), Nan::New("{{ jsClassName }}.{{ jsFunctionName }}").ToLocalChecked());
-        v8::Local<v8::Value> argv[1] = {
+        Napi::Object err = Napi::Error::New(env, "Method {{ jsFunctionName }} has thrown an error.")->ToObject();
+        err.Set(Napi::String::New(env, "errno"), Napi::New(env, baton->error_code));
+        err.Set(Napi::String::New(env, "errorFunction"), Napi::String::New(env, "{{ jsClassName }}.{{ jsFunctionName }}"));
+        Napi::Value argv[1] = {
           err
         };
         callback->Call(1, argv, async_resource);

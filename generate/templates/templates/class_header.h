@@ -1,6 +1,7 @@
 #ifndef {{ cppClassName|upper }}_H
 #define {{ cppClassName|upper }}_H
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <string>
 #include <queue>
 #include <utility>
@@ -33,8 +34,7 @@ struct {{ cType }} {
 };
 {%endif%}
 
-using namespace node;
-using namespace v8;
+using namespace Napi;
 
 {%if cType %}
 {%partial traits .%}
@@ -44,7 +44,7 @@ class {{ cppClassName }} : public
 {%if cType %}
   NodeGitWrapper<{{ cppClassName }}Traits>
 {%else%}
-  Nan::ObjectWrap
+  Napi::ObjectWrap
 {%endif%}
 {
   {%if cType %}
@@ -52,7 +52,7 @@ class {{ cppClassName }} : public
     friend class NodeGitWrapper<{{ cppClassName }}Traits>;
   {%endif %}
   public:
-    static void InitializeComponent (v8::Local<v8::Object> target);
+    static void InitializeComponent (Napi::Object target);
 
     {% each functions as function %}
       {% if not function.ignore %}
@@ -68,7 +68,7 @@ class {{ cppClassName }} : public
     );
 
     static void {{ function.cppFunctionName }}_{{ arg.name }}_async(void *baton);
-    static void {{ function.cppFunctionName }}_{{ arg.name }}_promiseCompleted(bool isFulfilled, AsyncBaton *_baton, v8::Local<v8::Value> result);
+    static void {{ function.cppFunctionName }}_{{ arg.name }}_promiseCompleted(bool isFulfilled, AsyncBaton *_baton, Napi::Value result);
     struct {{ function.cppFunctionName }}_{{ arg.name|titleCase }}Baton : public AsyncBatonWithResult<{{ arg.return.type }}> {
       {% each arg.args|argsInfo as cbArg %}
       {{ cbArg.cType }} {{ cbArg.name }};
@@ -95,7 +95,7 @@ class {{ cppClassName }} : public
         {% endif %}
       )
     {}
-    {{ cppClassName }}({{ cType }} *raw, bool selfFreeing, v8::Local<v8::Object> owner = v8::Local<v8::Object>())
+    {{ cppClassName }}({{ cType }} *raw, bool selfFreeing, Napi::Object owner = Napi::Object())
       : NodeGitWrapper<{{ cppClassName }}Traits>(raw, selfFreeing, owner)
     {}
     ~{{ cppClassName }}();
@@ -105,7 +105,7 @@ class {{ cppClassName }} : public
       {% if not function.ignore %}
         {% each function.args as arg %}
           {% if arg.saveArg %}
-    Nan::Persistent<Object> {{ function.cppFunctionName }}_{{ arg.name }};
+    Napi::ObjectReference {{ function.cppFunctionName }}_{{ arg.name }};
           {% endif %}
         {% endeach %}
       {% endif %}
@@ -135,16 +135,16 @@ class {{ cppClassName }} : public
         {%endif%}
       {%endeach%}
     };
-    class {{ function.cppFunctionName }}Worker : public Nan::AsyncWorker {
+    class {{ function.cppFunctionName }}Worker : public Napi::AsyncWorker {
       public:
         {{ function.cppFunctionName }}Worker(
             {{ function.cppFunctionName }}Baton *_baton,
-            Nan::Callback *callback
-        ) : Nan::AsyncWorker(callback)
+            Napi::FunctionReference *callback
+        ) : Napi::AsyncWorker(callback)
           , baton(_baton) {};
         ~{{ function.cppFunctionName }}Worker() {};
         void Execute();
-        void HandleOKCallback();
+        void OnOK();
 
       private:
         {{ function.cppFunctionName }}Baton *baton;
@@ -162,7 +162,7 @@ class {{ cppClassName }} : public
     struct {{ function.cppFunctionName }}_globalPayload {
           {%each function.args as arg %}
             {%if arg.isCallbackFunction %}
-      Nan::Callback * {{ arg.name }};
+      Napi::FunctionReference * {{ arg.name }};
             {%endif%}
           {%endeach%}
 

@@ -1,5 +1,5 @@
 template<typename Traits>
-NodeGitWrapper<Traits>::NodeGitWrapper(typename Traits::cType *raw, bool selfFreeing, v8::Local<v8::Object> owner) {
+NodeGitWrapper<Traits>::NodeGitWrapper(typename Traits::cType *raw, bool selfFreeing, Napi::Object owner) {
   if (!owner.IsEmpty()) {
     // if we have an owner, there are two options - either we duplicate the raw object
     // (so we own the duplicate, and can self-free it)
@@ -29,7 +29,8 @@ template<typename Traits>
 NodeGitWrapper<Traits>::NodeGitWrapper(const char *error) {
   selfFreeing = false;
   raw = NULL;
-  Nan::ThrowError(error);
+  Napi::Error::New(env, error).ThrowAsJavaScriptException();
+
 }
 
 template<typename Traits>
@@ -45,8 +46,8 @@ template<typename Traits>
 NAN_METHOD(NodeGitWrapper<Traits>::JSNewFunction) {
   cppClass * instance;
 
-  if (info.Length() == 0 || !info[0]->IsExternal()) {
-    Nan::TryCatch tryCatch;
+  if (info.Length() == 0 || !info[0].IsExternal()) {
+    Napi::TryCatch tryCatch;
     instance = new cppClass();
     // handle the case where the default constructor is not supported
     if(tryCatch.HasCaught()) {
@@ -56,26 +57,26 @@ NAN_METHOD(NodeGitWrapper<Traits>::JSNewFunction) {
     }
   } else {
     instance = new cppClass(static_cast<cType *>(
-      Local<External>::Cast(info[0])->Value()),
-      Nan::To<bool>(info[1]).FromJust(),
-      info.Length() >= 3 && !info[2].IsEmpty() && info[2]->IsObject() ? info[2]->ToObject() : Local<v8::Object>()
+      info[0].As<Napi::External>()->Value()),
+      info[1].As<Napi::Boolean>().Value(),
+      info.Length() >= 3 && !info[2].IsEmpty() && info[2].IsObject() ? info[2].ToObject() : Local<v8::Object>()
     );
   }
 
   instance->Wrap(info.This());
-  info.GetReturnValue().Set(info.This());
+  return info.This();
 }
 
 template<typename Traits>
-v8::Local<v8::Value> NodeGitWrapper<Traits>::New(const typename Traits::cType *raw, bool selfFreeing, v8::Local<v8::Object> owner) {
-  Nan::EscapableHandleScope scope;
-  Local<v8::Value> argv[3] = { Nan::New<External>((void *)raw), Nan::New(selfFreeing), owner };
+Napi::Value NodeGitWrapper<Traits>::New(const typename Traits::cType *raw, bool selfFreeing, Napi::Object owner) {
+  Napi::EscapableHandleScope scope(env);
+  Local<v8::Value> argv[3] = { Napi::External::New(env, (void *)raw), Napi::New(env, selfFreeing), owner };
   return scope.Escape(
-    Nan::NewInstance(
-      Nan::New(constructor_template),
+    Napi::NewInstance(
+      Napi::New(env, constructor),
       owner.IsEmpty() ? 2 : 3, // passing an empty handle as part of the arguments causes a crash
       argv
-    ).ToLocalChecked());
+    ));
 }
 
 template<typename Traits>
@@ -89,7 +90,7 @@ void NodeGitWrapper<Traits>::ClearValue() {
 }
 
 template<typename Traits>
-Nan::Persistent<v8::Function> NodeGitWrapper<Traits>::constructor_template;
+Napi::FunctionReference NodeGitWrapper<Traits>::constructor;
 
 template<typename Traits>
 int NodeGitWrapper<Traits>::SelfFreeingInstanceCount;
@@ -99,16 +100,16 @@ int NodeGitWrapper<Traits>::NonSelfFreeingConstructedCount;
 
 template<typename Traits>
 NAN_METHOD(NodeGitWrapper<Traits>::GetSelfFreeingInstanceCount) {
-  info.GetReturnValue().Set(SelfFreeingInstanceCount);
+  return SelfFreeingInstanceCount;
 }
 
 template<typename Traits>
 NAN_METHOD(NodeGitWrapper<Traits>::GetNonSelfFreeingConstructedCount) {
-  info.GetReturnValue().Set(NonSelfFreeingConstructedCount);
+  return NonSelfFreeingConstructedCount;
 }
 
 template<typename Traits>
-void NodeGitWrapper<Traits>::InitializeTemplate(v8::Local<v8::FunctionTemplate> &tpl) {
-  Nan::SetMethod(tpl, "getSelfFreeingInstanceCount", GetSelfFreeingInstanceCount);
-  Nan::SetMethod(tpl, "getNonSelfFreeingConstructedCount", GetNonSelfFreeingConstructedCount);
+void NodeGitWrapper<Traits>::InitializeTemplate(Napi::FunctionReference &tpl) {
+  Napi::SetMethod(tpl, "getSelfFreeingInstanceCount", GetSelfFreeingInstanceCount);
+  Napi::SetMethod(tpl, "getNonSelfFreeingConstructedCount", GetNonSelfFreeingConstructedCount);
 }

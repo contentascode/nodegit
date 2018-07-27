@@ -6,27 +6,26 @@
 #define WRAPPER_H
 
 #include <v8.h>
-#include <node.h>
+#include <napi.h>
+#include <uv.h>
 
-#include "nan.h"
 
-using namespace node;
-using namespace v8;
+using namespace Napi;
 
-class Wrapper : public Nan::ObjectWrap {
+class Wrapper : public Napi::ObjectWrap<Wrapper> {
   public:
 
-    static Nan::Persistent<FunctionTemplate> constructor_template;
-    static void InitializeComponent (v8::Local<v8::Object> target);
+    static Napi::FunctionReference constructor;
+    static void InitializeComponent (Napi::Object target);
 
     void *GetValue();
-    static v8::Local<v8::Value> New(const void *raw);
+    static Napi::Value New(const void *raw);
 
   private:
     Wrapper(void *raw);
 
-    static NAN_METHOD(JSNewFunction);
-    static NAN_METHOD(ToBuffer);
+    static Napi::Value JSNewFunction(const Napi::CallbackInfo& info);
+    static Napi::Value ToBuffer(const Napi::CallbackInfo& info);
 
     void *raw;
 };

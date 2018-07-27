@@ -2,7 +2,8 @@
 #define ASYNC_BATON
 
 #include <uv.h>
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 
 #include "lock_master.h"
 #include "nodegit.h"

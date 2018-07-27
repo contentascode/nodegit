@@ -1,4 +1,5 @@
-#include <node.h>
+#include <napi.h>
+#include <uv.h>
 #include <v8.h>
 
 #include <git2.h>
@@ -23,24 +24,24 @@
 #include "../include/convenient_hunk.h"
 #include "../include/filter_registry.h"
 
-#if (NODE_MODULE_VERSION > 48)
-  v8::Local<v8::Value> GetPrivate(v8::Local<v8::Object> object,
-                                      v8::Local<v8::String> key) {
+#if (NODE_API_MODULE_VERSION > 48)
+  Napi::Value GetPrivate(Napi::Object object,
+                                      Napi::String key) {
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
     v8::Local<v8::Context> context = isolate->GetCurrentContext();
     v8::Local<v8::Private> privateKey = v8::Private::ForApi(isolate, key);
-    v8::Local<v8::Value> value;
+    Napi::Value value;
     v8::Maybe<bool> result = object->HasPrivate(context, privateKey);
-    if (!(result.IsJust() && result.FromJust()))
-      return v8::Local<v8::Value>();
+    if (!(result.IsJust() && result))
+      return Napi::Value();
     if (object->GetPrivate(context, privateKey).ToLocal(&value))
       return value;
-    return v8::Local<v8::Value>();
+    return Napi::Value();
   }
 
-  void SetPrivate(v8::Local<v8::Object> object,
-                      v8::Local<v8::String> key,
-                      v8::Local<v8::Value> value) {
+  void SetPrivate(Napi::Object object,
+                      Napi::String key,
+                      Napi::Value value) {
     if (value.IsEmpty())
       return;
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
@@ -49,14 +50,14 @@
     object->SetPrivate(context, privateKey, value);
   }
 #else
-  v8::Local<v8::Value> GetPrivate(v8::Local<v8::Object> object,
-                                      v8::Local<v8::String> key) {
+  Napi::Value GetPrivate(Napi::Object object,
+                                      Napi::String key) {
     return object->GetHiddenValue(key);
   }
 
-  void SetPrivate(v8::Local<v8::Object> object,
-                      v8::Local<v8::String> key,
-                      v8::Local<v8::Value> value) {
+  void SetPrivate(Napi::Object object,
+                      Napi::String key,
+                      Napi::Value value) {
     object->SetHiddenValue(key, value);
   }
 #endif
@@ -66,11 +67,11 @@ void LockMasterEnable(const FunctionCallbackInfo<Value>& info) {
 }
 
 void LockMasterSetStatus(const FunctionCallbackInfo<Value>& info) {
-  Nan::HandleScope scope;
+  Napi::HandleScope scope(env);
 
   // convert the first argument to Status
-  if(info.Length() >= 0 && info[0]->IsNumber()) {
-    v8::Local<v8::Int32> value = info[0]->ToInt32();
+  if(info.Length() >= 0 && info[0].IsNumber()) {
+    v8::Local<v8::Int32> value = info[0].ToInt32();
     LockMaster::Status status = static_cast<LockMaster::Status>(value->Value());
     if(status >= LockMaster::Disabled && status <= LockMaster::Enabled) {
       LockMaster::SetStatus(status);
@@ -79,20 +80,21 @@ void LockMasterSetStatus(const FunctionCallbackInfo<Value>& info) {
   }
 
   // argument error
-  Nan::ThrowError("Argument must be one 0, 1 or 2");
+  Napi::Error::New(env, "Argument must be one 0, 1 or 2").ThrowAsJavaScriptException();
+
 }
 
 void LockMasterGetStatus(const FunctionCallbackInfo<Value>& info) {
-  info.GetReturnValue().Set(Nan::New(LockMaster::GetStatus()));
+  return Napi::New(env, LockMaster::GetStatus());
 }
 
 void LockMasterGetDiagnostics(const FunctionCallbackInfo<Value>& info) {
   LockMaster::Diagnostics diagnostics(LockMaster::GetDiagnostics());
 
   // return a plain JS object with properties
-  v8::Local<v8::Object> result = Nan::New<v8::Object>();
-  result->Set(Nan::New("storedMutexesCount").ToLocalChecked(), Nan::New(diagnostics.storedMutexesCount));
-  info.GetReturnValue().Set(result);
+  Napi::Object result = Napi::Object::New(env);
+  result.Set(Napi::String::New(env, "storedMutexesCount"), Napi::New(env, diagnostics.storedMutexesCount));
+  return result;
 }
 
 static uv_mutex_t *opensslMutexes;
@@ -122,14 +124,14 @@ void OpenSSL_ThreadSetup() {
 
 ThreadPool libgit2ThreadPool(10, uv_default_loop());
 
-extern "C" void init(v8::Local<v8::Object> target) {
+extern "C" void init(Napi::Object target) {
   // Initialize thread safety in openssl and libssh2
   OpenSSL_ThreadSetup();
   init_ssh2();
   // Initialize libgit2.
   git_libgit2_init();
 
-  Nan::HandleScope scope;
+  Napi::HandleScope scope(env);
 
   Wrapper::InitializeComponent(target);
   PromiseCompletion::InitializeComponent();
@@ -148,14 +150,14 @@ extern "C" void init(v8::Local<v8::Object> target) {
   NODE_SET_METHOD(target, "getThreadSafetyStatus", LockMasterGetStatus);
   NODE_SET_METHOD(target, "getThreadSafetyDiagnostics", LockMasterGetDiagnostics);
 
-  v8::Local<v8::Object> threadSafety = Nan::New<v8::Object>();
-  threadSafety->Set(Nan::New("DISABLED").ToLocalChecked(), Nan::New((int)LockMaster::Disabled));
-  threadSafety->Set(Nan::New("ENABLED_FOR_ASYNC_ONLY").ToLocalChecked(), Nan::New((int)LockMaster::EnabledForAsyncOnly));
-  threadSafety->Set(Nan::New("ENABLED").ToLocalChecked(), Nan::New((int)LockMaster::Enabled));
+  Napi::Object threadSafety = Napi::Object::New(env);
+  threadSafety.Set(Napi::String::New(env, "DISABLED"), Napi::New(env, (int)LockMaster::Disabled));
+  threadSafety.Set(Napi::String::New(env, "ENABLED_FOR_ASYNC_ONLY"), Napi::New(env, (int)LockMaster::EnabledForAsyncOnly));
+  threadSafety.Set(Napi::String::New(env, "ENABLED"), Napi::New(env, (int)LockMaster::Enabled));
 
-  target->Set(Nan::New("THREAD_SAFETY").ToLocalChecked(), threadSafety);
+  target.Set(Napi::String::New(env, "THREAD_SAFETY"), threadSafety);
 
   LockMaster::Initialize();
 }
 
-NODE_MODULE(nodegit, init)
+NODE_API_MODULE(nodegit, init)

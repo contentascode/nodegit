@@ -1,6 +1,7 @@
 #ifndef GITFILTERREGISTRY_H
 #define GITFILTERREGISTRY_H
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <string>
 #include <queue>
 #include <utility>
@@ -17,21 +18,20 @@ extern "C" {
 
 #include "../include/filter.h"
 
-using namespace node;
-using namespace v8;
+using namespace Napi;
 
 
-class GitFilterRegistry : public Nan::ObjectWrap {
+class GitFilterRegistry : public Napi::ObjectWrap<GitFilterRegistry> {
    public:
-    static void InitializeComponent(v8::Local<v8::Object> target);
+    static void InitializeComponent(Napi::Object target);
 
-    static Nan::Persistent<v8::Object> persistentHandle;
+    static Napi::Persistent<v8::Object> persistentHandle;
 
   private:
          
-    static NAN_METHOD(GitFilterRegister);
+    static Napi::Value GitFilterRegister(const Napi::CallbackInfo& info);
 
-    static NAN_METHOD(GitFilterUnregister);
+    static Napi::Value GitFilterUnregister(const Napi::CallbackInfo& info);
 
     struct FilterRegisterBaton {
       const git_error *error;
@@ -47,25 +47,25 @@ class GitFilterRegistry : public Nan::ObjectWrap {
       int error_code;
     };
 
-    class RegisterWorker : public Nan::AsyncWorker {
+    class RegisterWorker : public Napi::AsyncWorker {
       public:
-        RegisterWorker(FilterRegisterBaton *_baton, Nan::Callback *callback) 
-        : Nan::AsyncWorker(callback), baton(_baton) {};
+        RegisterWorker(FilterRegisterBaton *_baton, Napi::FunctionReference *callback) 
+        : Napi::AsyncWorker(callback), baton(_baton) {};
         ~RegisterWorker() {};
         void Execute();
-        void HandleOKCallback();
+        void OnOK();
 
       private:
         FilterRegisterBaton *baton;
     };
 
-    class UnregisterWorker : public Nan::AsyncWorker {
+    class UnregisterWorker : public Napi::AsyncWorker {
       public:
-        UnregisterWorker(FilterUnregisterBaton *_baton, Nan::Callback *callback) 
-        : Nan::AsyncWorker(callback), baton(_baton) {};
+        UnregisterWorker(FilterUnregisterBaton *_baton, Napi::FunctionReference *callback) 
+        : Napi::AsyncWorker(callback), baton(_baton) {};
         ~UnregisterWorker() {};
         void Execute();
-        void HandleOKCallback();
+        void OnOK();
 
       private:
         FilterUnregisterBaton *baton;

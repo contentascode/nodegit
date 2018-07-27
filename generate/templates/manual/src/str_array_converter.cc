@@ -1,22 +1,21 @@
-#include <nan.h>
-#include <node.h>
+#include <napi.h>
+#include <uv.h>
 #include <string>
 #include <cstring>
 
 #include "../include/str_array_converter.h"
 #include "git2/strarray.h"
 
-using namespace v8;
-using namespace node;
+using namespace Napi;
 
 git_strarray *StrArrayConverter::Convert(Local<v8::Value> val) {
-  if (!val->BooleanValue()) {
+  if (!val.As<Napi::Boolean>().Value()) {
     return NULL;
   }
   else if (val->IsArray()) {
-    return ConvertArray(Array::Cast(*val));
+    return ConvertArray(*val.As<Napi::Array>());
   }
-  else if (val->IsString() || val->IsStringObject()) {
+  else if (val.IsString() || val->IsStringObject()) {
     return ConvertString(val->ToString());
   }
   else {
@@ -37,16 +36,16 @@ git_strarray *StrArrayConverter::ConvertArray(Array *val) {
   git_strarray *result = AllocStrArray(val->Length());
 
   for(size_t i = 0; i < result->count; i++) {
-    Nan::Utf8String entry(val->Get(i));
+    std::string entry = val->Get(i.As<Napi::String>());
     result->strings[i] = strdup(*entry);
   }
 
   return result;
 }
 
-git_strarray* StrArrayConverter::ConvertString(Local<String> val) {
+git_strarray* StrArrayConverter::ConvertString(Napi::String val) {
   char *strings[1];
-  Nan::Utf8String utf8String(val);
+  std::string utf8String = val.As<Napi::String>();
 
   strings[0] = *utf8String;
 

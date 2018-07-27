@@ -1,4 +1,5 @@
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <git2.h>
 #include <uv.h>
 #include <set>
@@ -79,7 +80,7 @@ uv_key_t LockMasterImpl::currentLockMasterKey;
 void LockMasterImpl::Initialize() {
   uv_mutex_init(&mapMutex);
   uv_key_create(&currentLockMasterKey);
-  Nan::AddGCEpilogueCallback(CleanupMutexes);
+  Napi::AddGCEpilogueCallback(CleanupMutexes);
 }
 
 NAN_GC_CALLBACK(LockMasterImpl::CleanupMutexes) {

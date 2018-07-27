@@ -1,7 +1,7 @@
 
 {%partial doc .%}
 NAN_METHOD({{ cppClassName }}::{{ cppFunctionName }}) {
-  Nan::EscapableHandleScope scope;
+  Napi::EscapableHandleScope scope(env);
   {%partial guardArguments .%}
 
   {%each .|returnsInfo 'true' as _return %}
@@ -17,8 +17,8 @@ NAN_METHOD({{ cppClassName }}::{{ cppFunctionName }}) {
       {%if not arg.isReturn %}
         {%partial convertFromV8 arg %}
         {%if arg.saveArg %}
-  v8::Local<Object> {{ arg.name }}(info[{{ arg.jsArg }}]->ToObject());
-  {{ cppClassName }} *thisObj = Nan::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This());
+  v8::Napi::Object {{ arg.name }}(info[{{ arg.jsArg }}]->ToObject());
+  {{ cppClassName }} *thisObj = Napi::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This());
 
   thisObj->{{ cppFunctionName }}_{{ arg.name }}.Reset({{ arg.name }});
         {%endif%}
@@ -31,7 +31,7 @@ NAN_METHOD({{ cppClassName }}::{{ cppFunctionName }}) {
 
 {%-- Inside a free call, if the value is already free'd don't do it again.--%}
 {% if cppFunctionName == "Free" %}
-if (Nan::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->GetValue() != NULL) {
+if (Napi::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->GetValue() != NULL) {
 {% endif %}
 
   giterr_clear();
@@ -40,7 +40,7 @@ if (Nan::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->GetValue() != NULL
     LockMaster lockMaster(/*asyncAction: */false{%each args|argsInfo as arg %}
       {%if arg.cType|isPointer%}{%if not arg.isReturn%}
         ,{%if arg.isSelf %}
-    Nan::ObjectWrap::Unwrap<{{ arg.cppClassName }}>(info.This())->GetValue()
+    Napi::ObjectWrap::Unwrap<{{ arg.cppClassName }}>(info.This())->GetValue()
         {%else%}
     from_{{ arg.name }}
       {%endif%}
@@ -54,7 +54,7 @@ if (Nan::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->GetValue() != NULL
         {%if not arg.shouldAlloc %}&{%endif%}
       {%endif%}
       {%if arg.isSelf %}
-  Nan::ObjectWrap::Unwrap<{{ arg.cppClassName }}>(info.This())->GetValue()
+  Napi::ObjectWrap::Unwrap<{{ arg.cppClassName }}>(info.This())->GetValue()
       {%elsif arg.isReturn %}
   {{ arg.name }}
       {%else%}
@@ -70,58 +70,60 @@ if (Nan::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->GetValue() != NULL
       {%if arg.shouldAlloc %}
       free({{ arg.name }});
       {%elsif arg | isOid %}
-      if (info[{{ arg.jsArg }}]->IsString()) {
+      if (info[{{ arg.jsArg }}].IsString()) {
         free({{ arg.name }});
       }
       {%endif%}
     {%endeach%}
 
       if (giterr_last()) {
-        return Nan::ThrowError(giterr_last()->message);
+        Napi::Error::New(env, giterr_last()->message).ThrowAsJavaScriptException();
+        return env.Null();
       } else {
-        return Nan::ThrowError("Unknown Error");
+        Napi::Error::New(env, "Unknown Error").ThrowAsJavaScriptException();
+        return env.Null();
       }
     }
   {%endif%}
 
   {% if cppFunctionName == "Free" %}
-    Nan::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->ClearValue();
+    Napi::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->ClearValue();
   }
   {% endif %}
 
 
   {%each args|argsInfo as arg %}
     {%if arg | isOid %}
-    if (info[{{ arg.jsArg }}]->IsString()) {
+    if (info[{{ arg.jsArg }}].IsString()) {
       free((void *)from_{{ arg.name }});
     }
     {%endif%}
   {%endeach%}
 
   {%if not .|returnsCount %}
-    return info.GetReturnValue().Set(scope.Escape(Nan::Undefined()));
+    return return scope.Escape(env.Undefined());
   {%else%}
     {%if return.cType | isPointer %}
     // null checks on pointers
     if (!result) {
-      return info.GetReturnValue().Set(scope.Escape(Nan::Undefined()));
+      return return scope.Escape(env.Undefined());
     }
     {%endif%}
 
-    v8::Local<v8::Value> to;
+    Napi::Value to;
     {%if .|returnsCount > 1 %}
-    v8::Local<Object> toReturn = Nan::New<Object>();
+    v8::Napi::Object toReturn = Napi::Object::New(env);
     {%endif%}
     {%each .|returnsInfo as _return %}
       {%partial convertToV8 _return %}
       {%if .|returnsCount > 1 %}
-    Nan::Set(toReturn, Nan::New("{{ _return.returnNameOrName }}").ToLocalChecked(), to);
+    (toReturn).Set(Napi::String::New(env, "{{ _return.returnNameOrName }}"), to);
       {%endif%}
     {%endeach%}
     {%if .|returnsCount == 1 %}
-    return info.GetReturnValue().Set(scope.Escape(to));
+    return return scope.Escape(to);
     {%else%}
-    return info.GetReturnValue().Set(scope.Escape(toReturn));
+    return return scope.Escape(toReturn);
     {%endif%}
   {%endif%}
   }

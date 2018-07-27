@@ -1,33 +1,36 @@
-NAN_METHOD(GitRevwalk::FileHistoryWalk)
+Napi::Value GitRevwalk::FileHistoryWalk(const Napi::CallbackInfo& info)
 {
-  if (info.Length() == 0 || !info[0]->IsString()) {
-    return Nan::ThrowError("File path to get the history is required.");
+  if (info.Length() == 0 || !info[0].IsString()) {
+    Napi::Error::New(env, "File path to get the history is required.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  if (info.Length() == 1 || !info[1]->IsNumber()) {
-    return Nan::ThrowError("Max count is required and must be a number.");
+  if (info.Length() == 1 || !info[1].IsNumber()) {
+    Napi::Error::New(env, "Max count is required and must be a number.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  if (info.Length() == 2 || !info[2]->IsFunction()) {
-    return Nan::ThrowError("Callback is required and must be a Function.");
+  if (info.Length() == 2 || !info[2].IsFunction()) {
+    Napi::Error::New(env, "Callback is required and must be a Function.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   FileHistoryWalkBaton* baton = new FileHistoryWalkBaton;
 
   baton->error_code = GIT_OK;
   baton->error = NULL;
-  String::Utf8Value from_js_file_path(info[0]->ToString());
+  Napi::String from_js_file_path(env, info[0].ToString());
   baton->file_path = strdup(*from_js_file_path);
-  baton->max_count = Nan::To<unsigned int>(info[1]).FromJust();
+  baton->max_count = Napi::To<unsigned int>(info[1]);
   baton->out = new std::vector< std::pair<git_commit *, std::pair<char *, git_delta_t> > *>;
   baton->out->reserve(baton->max_count);
-  baton->walk = Nan::ObjectWrap::Unwrap<GitRevwalk>(info.This())->GetValue();
+  baton->walk = info.This())->GetValue(.Unwrap<GitRevwalk>();
 
-  Nan::Callback *callback = new Nan::Callback(Local<Function>::Cast(info[2]));
+  Napi::FunctionReference *callback = new Napi::FunctionReference(info[2].As<Napi::Function>());
   FileHistoryWalkWorker *worker = new FileHistoryWalkWorker(baton, callback);
   worker->SaveToPersistent("fileHistoryWalk", info.This());
 
-  Nan::AsyncQueueWorker(worker);
+  worker.Queue();
   return;
 }
 
@@ -253,33 +256,33 @@ void GitRevwalk::FileHistoryWalkWorker::Execute()
   }
 }
 
-void GitRevwalk::FileHistoryWalkWorker::HandleOKCallback()
+void GitRevwalk::FileHistoryWalkWorker::OnOK()
 {
   if (baton->out != NULL) {
     unsigned int size = baton->out->size();
-    Local<Array> result = Nan::New<Array>(size);
+    Napi::Array result = Napi::Array::New(env, size);
     for (unsigned int i = 0; i < size; i++) {
-      Local<v8::Object> historyEntry = Nan::New<Object>();
+      Local<v8::Object> historyEntry = Napi::Object::New(env);
       std::pair<git_commit *, std::pair<char *, git_delta_t> > *batonResult = baton->out->at(i);
-      Nan::Set(historyEntry, Nan::New("commit").ToLocalChecked(), GitCommit::New(batonResult->first, true));
-      Nan::Set(historyEntry, Nan::New("status").ToLocalChecked(), Nan::New<Number>(batonResult->second.second));
+      (historyEntry).Set(Napi::String::New(env, "commit"), GitCommit::New(batonResult->first, true));
+      (historyEntry).Set(Napi::String::New(env, "status"), Napi::Number::New(env, batonResult->second.second));
       if (batonResult->second.second == GIT_DELTA_RENAMED) {
         char *namePair = batonResult->second.first;
         char *split = strchr(namePair, '\n');
         *split = '\0';
         char *oldName = split + 1;
 
-        Nan::Set(historyEntry, Nan::New("oldName").ToLocalChecked(), Nan::New(oldName).ToLocalChecked());
-        Nan::Set(historyEntry, Nan::New("newName").ToLocalChecked(), Nan::New(namePair).ToLocalChecked());
+        (historyEntry).Set(Napi::String::New(env, "oldName"), Napi::New(env, oldName));
+        (historyEntry).Set(Napi::String::New(env, "newName"), Napi::New(env, namePair));
       }
-      Nan::Set(result, Nan::New<Number>(i), historyEntry);
+      (result).Set(Napi::Number::New(env, i), historyEntry);
 
       free(batonResult->second.first);
       free(batonResult);
     }
 
     Local<v8::Value> argv[2] = {
-      Nan::Null(),
+      env.Null(),
       result
     };
     callback->Call(2, argv, async_resource);
@@ -291,12 +294,12 @@ void GitRevwalk::FileHistoryWalkWorker::HandleOKCallback()
   if (baton->error) {
     Local<v8::Object> err;
     if (baton->error->message) {
-      err = Nan::Error(baton->error->message)->ToObject();
+      err = Napi::Error::New(env, baton->error->message)->ToObject();
     } else {
-      err = Nan::Error("Method fileHistoryWalk has thrown an error.")->ToObject();
+      err = Napi::Error::New(env, "Method fileHistoryWalk has thrown an error.")->ToObject();
     }
-    err->Set(Nan::New("errno").ToLocalChecked(), Nan::New(baton->error_code));
-    err->Set(Nan::New("errorFunction").ToLocalChecked(), Nan::New("Revwalk.fileHistoryWalk").ToLocalChecked());
+    err.Set(Napi::String::New(env, "errno"), Napi::New(env, baton->error_code));
+    err.Set(Napi::String::New(env, "errorFunction"), Napi::String::New(env, "Revwalk.fileHistoryWalk"));
     Local<v8::Value> argv[1] = {
       err
     };
@@ -311,9 +314,9 @@ void GitRevwalk::FileHistoryWalkWorker::HandleOKCallback()
   }
 
   if (baton->error_code < 0) {
-    Local<v8::Object> err = Nan::Error("Method next has thrown an error.")->ToObject();
-    err->Set(Nan::New("errno").ToLocalChecked(), Nan::New(baton->error_code));
-    err->Set(Nan::New("errorFunction").ToLocalChecked(), Nan::New("Revwalk.fileHistoryWalk").ToLocalChecked());
+    Local<v8::Object> err = Napi::Error::New(env, "Method next has thrown an error.")->ToObject();
+    err.Set(Napi::String::New(env, "errno"), Napi::New(env, baton->error_code));
+    err.Set(Napi::String::New(env, "errorFunction"), Napi::String::New(env, "Revwalk.fileHistoryWalk"));
     Local<v8::Value> argv[1] = {
       err
     };

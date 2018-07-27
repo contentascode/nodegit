@@ -1,54 +1,54 @@
 /**
  * This code is auto-generated; unless you know what you're doing, do not modify!
  **/
-#include <nan.h>
-#include <node.h>
+#include <napi.h>
+#include <uv.h>
 #include <string>
 #include <cstring>
 
 #include "../include/wrapper.h"
 #include "node_buffer.h"
 
-using namespace v8;
-using namespace node;
+using namespace Napi;
 
 Wrapper::Wrapper(void *raw) {
   this->raw = raw;
 }
 
 void Wrapper::InitializeComponent(Local<v8::Object> target) {
-  Nan::HandleScope scope;
+  Napi::HandleScope scope(env);
 
-  Local<FunctionTemplate> tpl = Nan::New<FunctionTemplate>(JSNewFunction);
+  Napi::FunctionReference tpl = Napi::Function::New(env, JSNewFunction);
 
-  tpl->InstanceTemplate()->SetInternalFieldCount(1);
-  tpl->SetClassName(Nan::New("Wrapper").ToLocalChecked());
 
-  Nan::SetPrototypeMethod(tpl, "toBuffer", ToBuffer);
+  tpl->SetClassName(Napi::String::New(env, "Wrapper"));
 
-  constructor_template.Reset(tpl);
-  Nan::Set(target, Nan::New("Wrapper").ToLocalChecked(), Nan::GetFunction(tpl).ToLocalChecked());
+  InstanceMethod("toBuffer", &ToBuffer),
+
+  constructor.Reset(tpl);
+  (target).Set(Napi::String::New(env, "Wrapper"), Napi::GetFunction(tpl));
 }
 
-NAN_METHOD(Wrapper::JSNewFunction) {
+Napi::Value Wrapper::JSNewFunction(const Napi::CallbackInfo& info) {
 
-  if (info.Length() == 0 || !info[0]->IsExternal()) {
-    return Nan::ThrowError("void * is required.");
+  if (info.Length() == 0 || !info[0].IsExternal()) {
+    Napi::Error::New(env, "void * is required.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  Wrapper* object = new Wrapper(External::Cast(*info[0])->Value());
+  Wrapper* object = new Wrapper(*info[0].As<Napi::External>()->Value());
   object->Wrap(info.This());
 
-  info.GetReturnValue().Set(info.This());
+  return info.This();
 }
 
 Local<v8::Value> Wrapper::New(const void *raw) {
-  Nan::EscapableHandleScope scope;
+  Napi::EscapableHandleScope scope(env);
 
-  Local<v8::Value> argv[1] = { Nan::New<External>((void *)raw) };
-  Local<Object> instance;
-  Local<FunctionTemplate> constructorHandle = Nan::New(constructor_template);
-  instance = Nan::NewInstance(Nan::GetFunction(constructorHandle).ToLocalChecked(), 1, argv).ToLocalChecked();
+  Local<v8::Value> argv[1] = { Napi::External::New(env, (void *)raw) };
+  Napi::Object instance;
+  Napi::FunctionReference constructorHandle = Napi::New(env, constructor);
+  instance = Napi::NewInstance(Napi::GetFunction(constructorHandle), 1, argv);
 
   return scope.Escape(instance);
 }
@@ -57,24 +57,25 @@ void *Wrapper::GetValue() {
   return this->raw;
 }
 
-NAN_METHOD(Wrapper::ToBuffer) {
+Napi::Value Wrapper::ToBuffer(const Napi::CallbackInfo& info) {
 
-  if(info.Length() == 0 || !info[0]->IsNumber()) {
-    return Nan::ThrowError("Number is required.");
+  if(info.Length() == 0 || !info[0].IsNumber()) {
+    Napi::Error::New(env, "Number is required.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  int len = Nan::To<int>(info[0]).FromJust();
+  int len = info[0].As<Napi::Number>().Int32Value();
 
-  Local<Function> bufferConstructor = Local<Function>::Cast(
-    Nan::Get(Nan::GetCurrentContext()->Global(), Nan::New("Buffer").ToLocalChecked()).ToLocalChecked());
+  Napi::Function bufferConstructor = Napi::Function::Cast(
+    (Napi::GetCurrentContext()->Global()).Get(Napi::String::New(env, "Buffer")));
 
-  Local<v8::Value> constructorArgs[1] = { Nan::New(len) };
-  Local<Object> nodeBuffer = Nan::NewInstance(bufferConstructor, 1, constructorArgs).ToLocalChecked();
+  Local<v8::Value> constructorArgs[1] = { Napi::New(env, len) };
+  Napi::Object nodeBuffer = Napi::NewInstance(bufferConstructor, 1, constructorArgs);
 
-  std::memcpy(node::Buffer::Data(nodeBuffer), Nan::ObjectWrap::Unwrap<Wrapper>(info.This())->GetValue(), len);
+  std::memcpy(nodeBuffer.As<Napi::Buffer<char>>().Data(), info.This())->GetValue(), len.Unwrap<Wrapper>();
 
-  info.GetReturnValue().Set(nodeBuffer);
+  return nodeBuffer;
 }
 
 
-Nan::Persistent<FunctionTemplate> Wrapper::constructor_template;
+Napi::FunctionReference Wrapper::constructor;

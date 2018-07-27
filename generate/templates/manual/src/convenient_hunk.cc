@@ -1,4 +1,5 @@
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <string.h>
 
 extern "C" {
@@ -10,8 +11,7 @@ extern "C" {
 #include "../include/diff_line.h"
 
 using namespace std;
-using namespace v8;
-using namespace node;
+using namespace Napi;
 
 void HunkDataFree(HunkData *hunk) {
   while (!hunk->lines->empty()) {
@@ -33,44 +33,45 @@ ConvenientHunk::~ConvenientHunk() {
 }
 
 void ConvenientHunk::InitializeComponent(Local<v8::Object> target) {
-  Nan::HandleScope scope;
+  Napi::HandleScope scope(env);
 
-  Local<FunctionTemplate> tpl = Nan::New<FunctionTemplate>(JSNewFunction);
+  Napi::FunctionReference tpl = Napi::Function::New(env, JSNewFunction);
 
-  tpl->InstanceTemplate()->SetInternalFieldCount(1);
-  tpl->SetClassName(Nan::New("ConvenientHunk").ToLocalChecked());
 
-  Nan::SetPrototypeMethod(tpl, "size", Size);
-  Nan::SetPrototypeMethod(tpl, "lines", Lines);
+  tpl->SetClassName(Napi::String::New(env, "ConvenientHunk"));
 
-  Nan::SetPrototypeMethod(tpl, "oldStart", OldStart);
-  Nan::SetPrototypeMethod(tpl, "oldLines", OldLines);
-  Nan::SetPrototypeMethod(tpl, "newStart", NewStart);
-  Nan::SetPrototypeMethod(tpl, "newLines", NewLines);
-  Nan::SetPrototypeMethod(tpl, "headerLen", HeaderLen);
-  Nan::SetPrototypeMethod(tpl, "header", Header);
+  InstanceMethod("size", &Size),
+  InstanceMethod("lines", &Lines),
 
-  Local<Function> _constructor_template = Nan::GetFunction(tpl).ToLocalChecked();
-  constructor_template.Reset(_constructor_template);
-  Nan::Set(target, Nan::New("ConvenientHunk").ToLocalChecked(), _constructor_template);
+  InstanceMethod("oldStart", &OldStart),
+  InstanceMethod("oldLines", &OldLines),
+  InstanceMethod("newStart", &NewStart),
+  InstanceMethod("newLines", &NewLines),
+  InstanceMethod("headerLen", &HeaderLen),
+  InstanceMethod("header", &Header),
+
+  Napi::Function _constructor = Napi::GetFunction(tpl);
+  constructor.Reset(_constructor);
+  (target).Set(Napi::String::New(env, "ConvenientHunk"), _constructor);
 }
 
-NAN_METHOD(ConvenientHunk::JSNewFunction) {
+Napi::Value ConvenientHunk::JSNewFunction(const Napi::CallbackInfo& info) {
 
-  if (info.Length() == 0 || !info[0]->IsExternal()) {
-       return Nan::ThrowError("A new ConvenientHunk cannot be instantiated.");
+  if (info.Length() == 0 || !info[0].IsExternal()) {
+       Napi::Error::New(env, "A new ConvenientHunk cannot be instantiated.").ThrowAsJavaScriptException();
+       return env.Null();
    }
 
-  ConvenientHunk* object = new ConvenientHunk(static_cast<HunkData *>(Local<External>::Cast(info[0])->Value()));
+  ConvenientHunk* object = new ConvenientHunk(static_cast<HunkData *>(info[0].As<Napi::External>()->Value()));
   object->Wrap(info.This());
 
-  info.GetReturnValue().Set(info.This());
+  return info.This();
 }
 
 Local<v8::Value> ConvenientHunk::New(void *raw) {
-  Nan::EscapableHandleScope scope;
-  Local<v8::Value> argv[1] = { Nan::New<External>((void *)raw) };
-  return scope.Escape(Nan::NewInstance(Nan::New(ConvenientHunk::constructor_template), 1, argv).ToLocalChecked());
+  Napi::EscapableHandleScope scope(env);
+  Local<v8::Value> argv[1] = { Napi::External::New(env, (void *)raw) };
+  return scope.Escape(Napi::NewInstance(Napi::New(env, ConvenientHunk::constructor), 1, argv));
 }
 
 HunkData *ConvenientHunk::GetValue() {
@@ -81,27 +82,28 @@ size_t ConvenientHunk::GetSize() {
   return this->hunk->numLines;
 }
 
-NAN_METHOD(ConvenientHunk::Size) {
+Napi::Value ConvenientHunk::Size(const Napi::CallbackInfo& info) {
   Local<v8::Value> to;
-  to = Nan::New<Number>(Nan::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetSize());
-  info.GetReturnValue().Set(to);
+  to = Napi::Number::New(env, info.This())->GetSize().Unwrap<ConvenientHunk>();
+  return to;
 }
 
-NAN_METHOD(ConvenientHunk::Lines) {
-  if (info.Length() == 0 || !info[0]->IsFunction()) {
-    return Nan::ThrowError("Callback is required and must be a Function.");
+Napi::Value ConvenientHunk::Lines(const Napi::CallbackInfo& info) {
+  if (info.Length() == 0 || !info[0].IsFunction()) {
+    Napi::Error::New(env, "Callback is required and must be a Function.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   LinesBaton *baton = new LinesBaton;
 
-  baton->hunk = Nan::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue();
+  baton->hunk = info.This())->GetValue(.Unwrap<ConvenientHunk>();
 
-  Nan::Callback *callback = new Nan::Callback(Local<Function>::Cast(info[0]));
+  Napi::FunctionReference *callback = new Napi::FunctionReference(info[0].As<Napi::Function>());
   LinesWorker *worker = new LinesWorker(baton, callback);
 
   worker->SaveToPersistent("hunk", info.This());
 
-  Nan::AsyncQueueWorker(worker);
+  worker.Queue();
   return;
 }
 
@@ -121,65 +123,65 @@ void ConvenientHunk::LinesWorker::Execute() {
   }
 }
 
-void ConvenientHunk::LinesWorker::HandleOKCallback() {
+void ConvenientHunk::LinesWorker::OnOK() {
   unsigned int size = baton->lines->size();
-  Local<Array> result = Nan::New<Array>(size);
+  Napi::Array result = Napi::Array::New(env, size);
 
   for(unsigned int i = 0; i < size; ++i) {
-    Nan::Set(result, Nan::New<Number>(i), GitDiffLine::New(baton->lines->at(i), true));
+    (result).Set(Napi::Number::New(env, i), GitDiffLine::New(baton->lines->at(i), true));
   }
 
   delete baton->lines;
 
   Local<v8::Value> argv[2] = {
-    Nan::Null(),
+    env.Null(),
     result
   };
   callback->Call(2, argv, async_resource);
 }
 
-NAN_METHOD(ConvenientHunk::OldStart) {
+Napi::Value ConvenientHunk::OldStart(const Napi::CallbackInfo& info) {
   Local<v8::Value> to;
-  int old_start = Nan::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.old_start;
-  info.GetReturnValue().Set(Nan::New<Number>(old_start));
+  int old_start = Napi::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.old_start;
+  return Napi::Number::New(env, old_start);
 }
 
 
-NAN_METHOD(ConvenientHunk::OldLines) {
+Napi::Value ConvenientHunk::OldLines(const Napi::CallbackInfo& info) {
   Local<v8::Value> to;
-  int old_lines = Nan::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.old_lines;
-  info.GetReturnValue().Set(Nan::New<Number>(old_lines));
+  int old_lines = Napi::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.old_lines;
+  return Napi::Number::New(env, old_lines);
 }
 
-NAN_METHOD(ConvenientHunk::NewStart) {
+Napi::Value ConvenientHunk::NewStart(const Napi::CallbackInfo& info) {
   Local<v8::Value> to;
-  int new_start = Nan::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.new_start;
-  info.GetReturnValue().Set(Nan::New<Number>(new_start));
+  int new_start = Napi::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.new_start;
+  return Napi::Number::New(env, new_start);
 }
 
-NAN_METHOD(ConvenientHunk::NewLines) {
+Napi::Value ConvenientHunk::NewLines(const Napi::CallbackInfo& info) {
   Local<v8::Value> to;
-  int new_lines = Nan::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.new_lines;
-  info.GetReturnValue().Set(Nan::New<Number>(new_lines));
+  int new_lines = Napi::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.new_lines;
+  return Napi::Number::New(env, new_lines);
 }
 
-NAN_METHOD(ConvenientHunk::HeaderLen) {
+Napi::Value ConvenientHunk::HeaderLen(const Napi::CallbackInfo& info) {
   Local<v8::Value> to;
-  size_t header_len = Nan::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.header_len;
-  info.GetReturnValue().Set(Nan::New<Number>(header_len));
+  size_t header_len = Napi::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.header_len;
+  return Napi::Number::New(env, header_len);
 }
 
-NAN_METHOD(ConvenientHunk::Header) {
+Napi::Value ConvenientHunk::Header(const Napi::CallbackInfo& info) {
   Local<v8::Value> to;
 
-  char *header = Nan::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.header;
+  char *header = Napi::ObjectWrap::Unwrap<ConvenientHunk>(info.This())->GetValue()->hunk.header;
   if (header) {
-    to = Nan::New<String>(header).ToLocalChecked();
+    to = Napi::String::New(env, header);
   } else {
-    to = Nan::Null();
+    to = env.Null();
   }
 
-  info.GetReturnValue().Set(to);
+  return to;
 }
 
-Nan::Persistent<Function> ConvenientHunk::constructor_template;
+Napi::FunctionReference ConvenientHunk::constructor;

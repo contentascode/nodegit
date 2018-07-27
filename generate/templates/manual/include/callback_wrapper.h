@@ -1,14 +1,14 @@
 #ifndef CALLBACK_WRAPPER_H
 #define CALLBACK_WRAPPER_H
 
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <uv.h>
 
-using namespace v8;
-using namespace node;
+using namespace Napi;
 
 class CallbackWrapper {
-  Nan::Callback* jsCallback;
+  Napi::FunctionReference* jsCallback;
 
   // throttling data, used for callbacks that need to be throttled
   int throttle; // in milliseconds - if > 0, calls to the JS callback will be throttled
@@ -34,11 +34,11 @@ public:
     return jsCallback != NULL;
   }
 
-  Nan::Callback* GetCallback() {
+  Napi::FunctionReference* GetCallback() {
     return jsCallback;
   }
 
-  void SetCallback(Nan::Callback* callback, int throttle = 0, bool waitForResult = true) {
+  void SetCallback(Napi::FunctionReference* callback, int throttle = 0, bool waitForResult = true) {
     if(jsCallback) {
       delete jsCallback;
     }

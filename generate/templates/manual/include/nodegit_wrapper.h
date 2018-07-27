@@ -1,7 +1,8 @@
 #ifndef NODEGIT_WRAPPER_H
 #define NODEGIT_WRAPPER_H
 
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 
 // the Traits template parameter supplies:
 //  typename cppClass - the C++ type of the NodeGit wrapper (e.g. GitRepository)
@@ -14,7 +15,7 @@
 //  static void free(cType *raw) - frees the object using freeFunctionName
 
 template<typename Traits>
-class NodeGitWrapper : public Nan::ObjectWrap {
+class NodeGitWrapper : public Napi::ObjectWrap<NodeGitWrapper> {
 public:
   // replicate Traits typedefs for ease of use
   typedef typename Traits::cType cType;
@@ -34,28 +35,28 @@ protected:
   // owner of the object, in the memory management sense. only populated
   // when using ownedByThis, and the type doesn't have a dupFunction
   // CopyablePersistentTraits are used to get the reset-on-destruct behavior.
-  Nan::Persistent<v8::Object, Nan::CopyablePersistentTraits<v8::Object> > owner;
+  Napi::Persistent<v8::Object, Napi::CopyablePersistentTraits<v8::Object> > owner;
 
-  static Nan::Persistent<v8::Function> constructor_template;
+  static Napi::FunctionReference constructor;
 
   // diagnostic count of self-freeing object instances
   static int SelfFreeingInstanceCount;
   // diagnostic count of constructed non-self-freeing object instances
   static int NonSelfFreeingConstructedCount;
 
-  static void InitializeTemplate(v8::Local<v8::FunctionTemplate> &tpl);
+  static void InitializeTemplate(Napi::FunctionReference &tpl);
 
-  NodeGitWrapper(cType *raw, bool selfFreeing, v8::Local<v8::Object> owner);
+  NodeGitWrapper(cType *raw, bool selfFreeing, Napi::Object owner);
   NodeGitWrapper(const char *error); // calls ThrowError
   ~NodeGitWrapper();
 
-  static NAN_METHOD(JSNewFunction);
+  static Napi::Value JSNewFunction(const Napi::CallbackInfo& info);
 
-  static NAN_METHOD(GetSelfFreeingInstanceCount);
-  static NAN_METHOD(GetNonSelfFreeingConstructedCount);
+  static Napi::Value GetSelfFreeingInstanceCount(const Napi::CallbackInfo& info);
+  static Napi::Value GetNonSelfFreeingConstructedCount(const Napi::CallbackInfo& info);
 
 public:
-  static v8::Local<v8::Value> New(const cType *raw, bool selfFreeing, v8::Local<v8::Object> owner = v8::Local<v8::Object>());
+  static Napi::Value New(const cType *raw, bool selfFreeing, Napi::Object owner = Napi::Object());
 
   cType *GetValue();
   void ClearValue();

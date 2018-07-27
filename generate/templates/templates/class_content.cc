@@ -1,4 +1,5 @@
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <string.h>
 
 extern "C" {
@@ -22,8 +23,7 @@ extern "C" {
 #include <iostream>
 
 using namespace std;
-using namespace v8;
-using namespace node;
+using namespace Napi;
 
 {% if cType %}
   {{ cppClassName }}::~{{ cppClassName }}() {
@@ -43,51 +43,51 @@ using namespace node;
     {% endeach %}
   }
 
-  void {{ cppClassName }}::InitializeComponent(v8::Local<v8::Object> target) {
-    Nan::HandleScope scope;
+  void {{ cppClassName }}::InitializeComponent(Napi::Object target) {
+    Napi::HandleScope scope(env);
 
-    v8::Local<FunctionTemplate> tpl = Nan::New<FunctionTemplate>(JSNewFunction);
+    v8::Napi::FunctionReference tpl = Napi::Function::New(env, JSNewFunction);
 
-    tpl->InstanceTemplate()->SetInternalFieldCount(1);
-    tpl->SetClassName(Nan::New("{{ jsClassName }}").ToLocalChecked());
+
+    tpl->SetClassName(Napi::String::New(env, "{{ jsClassName }}"));
 
     {% each functions as function %}
       {% if not function.ignore %}
         {% if function.isPrototypeMethod %}
-          Nan::SetPrototypeMethod(tpl, "{{ function.jsFunctionName }}", {{ function.cppFunctionName }});
+          Napi::SetPrototypeMethod(tpl, "{{ function.jsFunctionName }}", {{ function.cppFunctionName }});
         {% else %}
-          Nan::SetMethod(tpl, "{{ function.jsFunctionName }}", {{ function.cppFunctionName }});
+          Napi::SetMethod(tpl, "{{ function.jsFunctionName }}", {{ function.cppFunctionName }});
         {% endif %}
       {% endif %}
     {% endeach %}
 
     {% each fields as field %}
       {% if not field.ignore %}
-        Nan::SetPrototypeMethod(tpl, "{{ field.jsFunctionName }}", {{ field.cppFunctionName }});
+        Napi::SetPrototypeMethod(tpl, "{{ field.jsFunctionName }}", {{ field.cppFunctionName }});
       {% endif %}
     {% endeach %}
 
     InitializeTemplate(tpl);
 
-    v8::Local<Function> _constructor_template = Nan::GetFunction(tpl).ToLocalChecked();
-    constructor_template.Reset(_constructor_template);
-    Nan::Set(target, Nan::New("{{ jsClassName }}").ToLocalChecked(), _constructor_template);
+    v8::Napi::Function _constructor = Napi::GetFunction(tpl);
+    constructor.Reset(_constructor);
+    (target).Set(Napi::String::New(env, "{{ jsClassName }}"), _constructor);
   }
 
 {% else %}
 
-  void {{ cppClassName }}::InitializeComponent(v8::Local<v8::Object> target) {
-    Nan::HandleScope scope;
+  void {{ cppClassName }}::InitializeComponent(Napi::Object target) {
+    Napi::HandleScope scope(env);
 
-    v8::Local<Object> object = Nan::New<Object>();
+    v8::Napi::Object object = Napi::Object::New(env);
 
     {% each functions as function %}
       {% if not function.ignore %}
-        Nan::SetMethod(object, "{{ function.jsFunctionName }}", {{ function.cppFunctionName }});
+        Napi::SetMethod(object, "{{ function.jsFunctionName }}", {{ function.cppFunctionName }});
       {% endif %}
     {% endeach %}
 
-    Nan::Set(target, Nan::New<String>("{{ jsClassName }}").ToLocalChecked(), object);
+    (target).Set(Napi::String::New(env, "{{ jsClassName }}"), object);
   }
 
 {% endif %}

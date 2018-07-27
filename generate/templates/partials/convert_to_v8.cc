@@ -2,15 +2,15 @@
 {% if cppClassName == 'String' %}
   if ({{= parsedName =}}){
     {% if size %}
-      to = Nan::New<String>({{= parsedName =}}, {{ size }}).ToLocalChecked();
+      to = Napi::String::New(env, {{= parsedName =}}, {{ size }});
     {% elsif cType == 'char **' %}
-      to = Nan::New<String>(*{{= parsedName =}}).ToLocalChecked();
+      to = Napi::String::New(env, *{{= parsedName =}});
     {% else %}
-      to = Nan::New<String>({{= parsedName =}}).ToLocalChecked();
+      to = Napi::String::New(env, {{= parsedName =}});
     {% endif %}
   }
   else {
-    to = Nan::Null();
+    to = env.Null();
   }
 
   {% if freeFunctionName %}
@@ -20,37 +20,37 @@
 {% elsif cppClassName|isV8Value %}
 
   {% if isCppClassIntType %}
-    to = Nan::New<{{ cppClassName }}>(({{ parsedClassName }}){{= parsedName =}});
+    to = Napi::{{ cppClassName }}::New(env, ({{ parsedClassName }}){{= parsedName =}});
   {% else %}
-    to = Nan::New<{{ cppClassName }}>({% if needsDereference %}*{% endif %}{{= parsedName =}});
+    to = Napi::{{ cppClassName }}::New(env, {% if needsDereference %}*{% endif %}{{= parsedName =}});
   {% endif %}
 
 {% elsif cppClassName == 'External' %}
 
-  to = Nan::New<External>((void *){{= parsedName =}});
+  to = Napi::External::New(env, (void *){{= parsedName =}});
 
 {% elsif cppClassName == 'Array' %}
 
   {%-- // FIXME this is not general purpose enough. --%}
   {% if size %}
-    v8::Local<Array> tmpArray = Nan::New<Array>({{= parsedName =}}->{{ size }});
+    v8::Napi::Array tmpArray = Napi::Array::New(env, {{= parsedName =}}->{{ size }});
     for (unsigned int i = 0; i < {{= parsedName =}}->{{ size }}; i++) {
-      Nan::Set(tmpArray, Nan::New<Number>(i), Nan::New<String>({{= parsedName =}}->{{ key }}[i]).ToLocalChecked());
+      (tmpArray).Set(Napi::Number::New(env, i), Napi::String::New(env, {{= parsedName =}}->{{ key }}[i]));
     }
   {% else %}
-    v8::Local<Array> tmpArray = Nan::New<Array>({{= parsedName =}});
+    v8::Napi::Array tmpArray = Napi::Array::New(env, {{= parsedName =}});
   {% endif %}
 
   to = tmpArray;
 {% elsif cppClassName == 'GitBuf' %}
   {% if doNotConvert %}
-  to = Nan::Null();
+  to = env.Null();
   {% else %}
   if ({{= parsedName =}}) {
-    to = Nan::New<String>({{= parsedName =}}->ptr, {{= parsedName = }}->size).ToLocalChecked();
+    to = Napi::String::New(env, {{= parsedName =}}->ptr, {{= parsedName = }}->size);
   }
   else {
-    to = Nan::Null();
+    to = env.Null();
   }
   {% endif %}
 {% else %}
@@ -69,7 +69,7 @@
     {% endif %}
   }
   else {
-    to = Nan::Null();
+    to = env.Null();
   }
 
 {% endif %}

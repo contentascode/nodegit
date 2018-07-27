@@ -1,7 +1,8 @@
 #ifndef CONVENIENTHUNK_H
 #define CONVENIENTHUNK_H
 // generated from class_header.h
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <string>
 
 #include "async_baton.h"
@@ -21,15 +22,14 @@ struct HunkData {
 
 void HunkDataFree(HunkData *hunk);
 
-using namespace node;
-using namespace v8;
+using namespace Napi;
 
-class ConvenientHunk : public Nan::ObjectWrap {
+class ConvenientHunk : public Napi::ObjectWrap<ConvenientHunk> {
   public:
-    static Nan::Persistent<Function> constructor_template;
-    static void InitializeComponent (v8::Local<v8::Object> target);
+    static Napi::FunctionReference constructor;
+    static void InitializeComponent (Napi::Object target);
 
-    static v8::Local<v8::Value> New(void *raw);
+    static Napi::Value New(void *raw);
 
     HunkData *GetValue();
     char *GetHeader();
@@ -41,35 +41,35 @@ class ConvenientHunk : public Nan::ObjectWrap {
 
     HunkData *hunk;
 
-    static NAN_METHOD(JSNewFunction);
-    static NAN_METHOD(Size);
+    static Napi::Value JSNewFunction(const Napi::CallbackInfo& info);
+    static Napi::Value Size(const Napi::CallbackInfo& info);
 
-    static NAN_METHOD(OldStart);
-    static NAN_METHOD(OldLines);
-    static NAN_METHOD(NewStart);
-    static NAN_METHOD(NewLines);
-    static NAN_METHOD(HeaderLen);
-    static NAN_METHOD(Header);
+    static Napi::Value OldStart(const Napi::CallbackInfo& info);
+    static Napi::Value OldLines(const Napi::CallbackInfo& info);
+    static Napi::Value NewStart(const Napi::CallbackInfo& info);
+    static Napi::Value NewLines(const Napi::CallbackInfo& info);
+    static Napi::Value HeaderLen(const Napi::CallbackInfo& info);
+    static Napi::Value Header(const Napi::CallbackInfo& info);
 
     struct LinesBaton {
       HunkData *hunk;
       std::vector<git_diff_line *> *lines;
     };
-    class LinesWorker : public Nan::AsyncWorker {
+    class LinesWorker : public Napi::AsyncWorker {
       public:
         LinesWorker(
             LinesBaton *_baton,
-            Nan::Callback *callback
-        ) : Nan::AsyncWorker(callback)
+            Napi::FunctionReference *callback
+        ) : Napi::AsyncWorker(callback)
           , baton(_baton) {};
         ~LinesWorker() {};
         void Execute();
-        void HandleOKCallback();
+        void OnOK();
 
       private:
         LinesBaton *baton;
     };
-    static NAN_METHOD(Lines);
+    static Napi::Value Lines(const Napi::CallbackInfo& info);
 };
 
 #endif

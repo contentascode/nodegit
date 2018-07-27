@@ -13,7 +13,8 @@ struct {{ cppClassName }}Traits {
     {{ cpyFunction }}(copy, src);
     *dest = copy;
   {% else %}
-    Nan::ThrowError("duplicate called on {{ cppClassName }} which cannot be duplicated");
+    Napi::Error::New(env, "duplicate called on {{ cppClassName }} which cannot be duplicated").ThrowAsJavaScriptException();
+
   {% endif %}
   }
 
@@ -22,7 +23,8 @@ struct {{ cppClassName }}Traits {
   {% if freeFunctionName %}
     ::{{ freeFunctionName }}(raw); // :: to avoid calling this free recursively
   {% else %}
-    Nan::ThrowError("free called on {{ cppClassName }} which cannot be freed");
+    Napi::Error::New(env, "free called on {{ cppClassName }} which cannot be freed").ThrowAsJavaScriptException();
+
   {% endif %}
   }
 };

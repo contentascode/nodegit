@@ -3,14 +3,15 @@
 
 #include <v8.h>
 
-#include "nan.h"
+#include "napi.h"
+#include "uv.h"
 #include "git2/buffer.h"
 
-using namespace v8;
+using namespace Napi;
 
 class GitBufConverter {
   public:
-    static git_buf *Convert(v8::Local<v8::Value> val);
+    static git_buf *Convert(Napi::Value val);
 };
 
 #endif

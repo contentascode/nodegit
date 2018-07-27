@@ -1,4 +1,5 @@
-#include <nan.h>
+#include <napi.h>
+#include <uv.h>
 #include <string.h>
 #ifdef WIN32
 #include <windows.h>
@@ -24,13 +25,12 @@ extern "C" {
   #include "{{ dependency }}"
 {% endeach %}
 
-using namespace v8;
-using namespace node;
+using namespace Napi;
 using namespace std;
 
 
 // generated from struct_content.cc
-{{ cppClassName }}::{{ cppClassName }}() : NodeGitWrapper<{{ cppClassName }}Traits>(NULL, true, v8::Local<v8::Object>())
+{{ cppClassName }}::{{ cppClassName }}() : NodeGitWrapper<{{ cppClassName }}Traits>(NULL, true, Napi::Object())
 {
   {% if ignoreInit == true %}
   this->raw = new {{ cType }};
@@ -49,7 +49,7 @@ using namespace std;
   this->ConstructFields();
 }
 
-{{ cppClassName }}::{{ cppClassName }}({{ cType }}* raw, bool selfFreeing, v8::Local<v8::Object> owner)
+{{ cppClassName }}::{{ cppClassName }}({{ cType }}* raw, bool selfFreeing, Napi::Object owner)
  : NodeGitWrapper<{{ cppClassName }}Traits>(raw, selfFreeing, owner)
 {
   this->ConstructFields();
@@ -78,7 +78,7 @@ void {{ cppClassName }}::ConstructFields() {
     {% if not field.ignore %}
       {% if not field.isEnum %}
         {% if field.hasConstructor |or field.isLibgitType %}
-          v8::Local<Object> {{ field.name }}Temp = {{ field.cppClassName }}::New(
+          v8::Napi::Object {{ field.name }}Temp = {{ field.cppClassName }}::New(
             {%if not field.cType|isPointer %}&{%endif%}this->raw->{{ field.name }},
             false
           )->ToObject();
@@ -96,7 +96,7 @@ void {{ cppClassName }}::ConstructFields() {
           {% endif %}
         {% elsif field.payloadFor %}
 
-          v8::Local<Value> {{ field.name }} = Nan::Undefined();
+          v8::Napi::Value {{ field.name }} = env.Undefined();
           this->{{ field.name }}.Reset({{ field.name }});
         {% endif %}
       {% endif %}
@@ -104,27 +104,27 @@ void {{ cppClassName }}::ConstructFields() {
   {% endeach %}
 }
 
-void {{ cppClassName }}::InitializeComponent(v8::Local<v8::Object> target) {
-  Nan::HandleScope scope;
+void {{ cppClassName }}::InitializeComponent(Napi::Object target) {
+  Napi::HandleScope scope(env);
 
-  v8::Local<FunctionTemplate> tpl = Nan::New<FunctionTemplate>(JSNewFunction);
+  v8::Napi::FunctionReference tpl = Napi::Function::New(env, JSNewFunction);
 
-  tpl->InstanceTemplate()->SetInternalFieldCount(1);
-  tpl->SetClassName(Nan::New("{{ jsClassName }}").ToLocalChecked());
+
+  tpl->SetClassName(Napi::String::New(env, "{{ jsClassName }}"));
 
   {% each fields as field %}
     {% if not field.ignore %}
     {% if not field | isPayload %}
-      Nan::SetAccessor(tpl->InstanceTemplate(), Nan::New("{{ field.jsFunctionName }}").ToLocalChecked(), Get{{ field.cppFunctionName}}, Set{{ field.cppFunctionName}});
+      Napi::SetAccessor(tpl->InstanceTemplate(), Napi::String::New(env, "{{ field.jsFunctionName }}"), Get{{ field.cppFunctionName}}, Set{{ field.cppFunctionName}});
     {% endif %}
     {% endif %}
   {% endeach %}
 
   InitializeTemplate(tpl);
 
-  v8::Local<Function> _constructor_template = Nan::GetFunction(tpl).ToLocalChecked();
-  constructor_template.Reset(_constructor_template);
-  Nan::Set(target, Nan::New("{{ jsClassName }}").ToLocalChecked(), _constructor_template);
+  v8::Napi::Function _constructor = Napi::GetFunction(tpl);
+  constructor.Reset(_constructor);
+  (target).Set(Napi::String::New(env, "{{ jsClassName }}"), _constructor);
 }
 
 {% partial fieldAccessors . %}

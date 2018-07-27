@@ -1,10 +1,12 @@
-NAN_METHOD(GitPatch::ConvenientFromDiff) {
-  if (info.Length() == 0 || !info[0]->IsObject()) {
-    return Nan::ThrowError("Diff diff is required.");
+Napi::Value GitPatch::ConvenientFromDiff(const Napi::CallbackInfo& info) {
+  if (info.Length() == 0 || !info[0].IsObject()) {
+    Napi::Error::New(env, "Diff diff is required.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
-  if (info.Length() == 1 || !info[1]->IsFunction()) {
-    return Nan::ThrowError("Callback is required and must be a Function.");
+  if (info.Length() == 1 || !info[1].IsFunction()) {
+    Napi::Error::New(env, "Callback is required and must be a Function.").ThrowAsJavaScriptException();
+    return env.Null();
   }
 
   ConvenientFromDiffBaton *baton = new ConvenientFromDiffBaton;
@@ -12,16 +14,16 @@ NAN_METHOD(GitPatch::ConvenientFromDiff) {
   baton->error_code = GIT_OK;
   baton->error = NULL;
 
-  baton->diff = Nan::ObjectWrap::Unwrap<GitDiff>(info[0]->ToObject())->GetValue();
+  baton->diff = info[0].ToObject())->GetValue(.Unwrap<GitDiff>();
   baton->out = new std::vector<PatchData *>;
   baton->out->reserve(git_diff_num_deltas(baton->diff));
 
-  Nan::Callback *callback = new Nan::Callback(Local<Function>::Cast(info[1]));
+  Napi::FunctionReference *callback = new Napi::FunctionReference(info[1].As<Napi::Function>());
   ConvenientFromDiffWorker *worker = new ConvenientFromDiffWorker(baton, callback);
 
   worker->SaveToPersistent("diff", info[0]);
 
-  Nan::AsyncQueueWorker(worker);
+  worker.Queue();
   return;
 }
 
@@ -74,19 +76,19 @@ void GitPatch::ConvenientFromDiffWorker::Execute() {
   }
 }
 
-void GitPatch::ConvenientFromDiffWorker::HandleOKCallback() {
+void GitPatch::ConvenientFromDiffWorker::OnOK() {
   if (baton->out != NULL) {
     unsigned int size = baton->out->size();
-    Local<Array> result = Nan::New<Array>(size);
+    Napi::Array result = Napi::Array::New(env, size);
 
     for (unsigned int i = 0; i < size; ++i) {
-      Nan::Set(result, Nan::New<Number>(i), ConvenientPatch::New((void *)baton->out->at(i)));
+      (result).Set(Napi::Number::New(env, i), ConvenientPatch::New((void *)baton->out->at(i)));
     }
 
     delete baton->out;
 
     Local<v8::Value> argv[2] = {
-      Nan::Null(),
+      env.Null(),
       result
     };
     callback->Call(2, argv, async_resource);
@@ -97,12 +99,12 @@ void GitPatch::ConvenientFromDiffWorker::HandleOKCallback() {
   if (baton->error) {
     Local<v8::Object> err;
     if (baton->error->message) {
-      err = Nan::Error(baton->error->message)->ToObject();
+      err = Napi::Error::New(env, baton->error->message)->ToObject();
     } else {
-      err = Nan::Error("Method convenientFromDiff has thrown an error.")->ToObject();
+      err = Napi::Error::New(env, "Method convenientFromDiff has thrown an error.")->ToObject();
     }
-    err->Set(Nan::New("errno").ToLocalChecked(), Nan::New(baton->error_code));
-    err->Set(Nan::New("errorFunction").ToLocalChecked(), Nan::New("Patch.convenientFromDiff").ToLocalChecked());
+    err.Set(Napi::String::New(env, "errno"), Napi::New(env, baton->error_code));
+    err.Set(Napi::String::New(env, "errorFunction"), Napi::String::New(env, "Patch.convenientFromDiff"));
     Local<v8::Value> argv[1] = {
       err
     };
@@ -118,9 +120,9 @@ void GitPatch::ConvenientFromDiffWorker::HandleOKCallback() {
   }
 
   if (baton->error_code < 0) {
-    Local<v8::Object> err = Nan::Error("method convenientFromDiff has thrown an error.")->ToObject();
-    err->Set(Nan::New("errno").ToLocalChecked(), Nan::New(baton->error_code));
-    err->Set(Nan::New("errorFunction").ToLocalChecked(), Nan::New("Patch.convenientFromDiff").ToLocalChecked());
+    Local<v8::Object> err = Napi::Error::New(env, "method convenientFromDiff has thrown an error.")->ToObject();
+    err.Set(Napi::String::New(env, "errno"), Napi::New(env, baton->error_code));
+    err.Set(Napi::String::New(env, "errorFunction"), Napi::String::New(env, "Patch.convenientFromDiff"));
     Local<v8::Value> argv[1] = {
       err
     };

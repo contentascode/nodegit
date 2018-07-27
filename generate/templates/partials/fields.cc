@@ -1,10 +1,10 @@
 {% each fields|fieldsInfo as field %}
   {% if not field.ignore %}
     NAN_METHOD({{ cppClassName }}::{{ field.cppFunctionName }}) {
-      v8::Local<v8::Value> to;
+      Napi::Value to;
 
       {% if field | isFixedLengthString %}
-      char* {{ field.name }} = (char *)Nan::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->GetValue()->{{ field.name }};
+      char* {{ field.name }} = (char *)Napi::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->GetValue()->{{ field.name }};
       {% else %}
       {{ field.cType }}
         {% if not field.cppClassName|isV8Value %}
@@ -18,11 +18,11 @@
         &
           {% endif %}
         {% endif %}
-        Nan::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->GetValue()->{{ field.name }};
+        Napi::ObjectWrap::Unwrap<{{ cppClassName }}>(info.This())->GetValue()->{{ field.name }};
       {% endif %}
 
       {% partial convertToV8 field %}
-      info.GetReturnValue().Set(to);
+      return to;
     }
   {% endif %}
 {% endeach %}

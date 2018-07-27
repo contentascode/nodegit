@@ -1,22 +1,21 @@
-#include <nan.h>
-#include <node.h>
+#include <napi.h>
+#include <uv.h>
 #include <string>
 
 #include "../include/git_buf_converter.h"
 #include "git2/buffer.h"
 
-using namespace v8;
-using namespace node;
+using namespace Napi;
 
 git_buf *GitBufConverter::Convert(Local<v8::Value> val) {
-  if (val->IsString() || val->IsStringObject()) {
-    v8::String::Utf8Value param1(val->ToString());
+  if (val.IsString() || val->IsStringObject()) {
+    Napi::String param1(env, val->ToString());
     std::string v8String = std::string(*param1);
 
     const size_t size = sizeof(git_buf);
     uint8_t* memory = reinterpret_cast<uint8_t *>(malloc(size));
     git_buf *result = reinterpret_cast<git_buf *>(memory);
-    size_t stringLength = v8String.length();
+    size_t stringLength = v8String.Length();
 
     memory = reinterpret_cast<uint8_t *>(malloc(stringLength));
 

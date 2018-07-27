@@ -2,8 +2,18 @@
   "targets": [
     {
       "target_name": "nodegit",
+      "cflags!": [ "-fno-exceptions" ],
+      "cflags_cc!": [ "-fno-exceptions" ],
+      "xcode_settings": { "GCC_ENABLE_CPP_EXCEPTIONS": "YES",
+        "CLANG_CXX_LIBRARY": "libc++",
+        "MACOSX_DEPLOYMENT_TARGET": "10.7",
+      },
+      "msvs_settings": {
+        "VCCLCompilerTool": { "ExceptionHandling": 1 },
+      },
 
       "dependencies": [
+        "<!(node -p 'require(\"node-addon-api\").gyp')",
         "vendor/libgit2.gyp:libgit2"
       ],
 
@@ -33,10 +43,11 @@
       ],
 
       "include_dirs": [
+        "<!@(node -p \"require('node-addon-api').include\")",
         "vendor/libv8-convert",
         "vendor/libssh2/include",
         "vendor/openssl/openssl/include",
-        "<!(node -e \"require('nan')\")"
+
       ],
 
       "cflags": [
