@@ -69,6 +69,7 @@ before_install:
 
 install:
   - set -e;
+  - python --version
   - travis_retry npm install;
 
 # This is a random private key used purely for testing.
