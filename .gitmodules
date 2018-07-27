@@ -4,3 +4,6 @@
 [submodule "vendor/libssh2"]
 	path = vendor/libssh2
 	url = https://github.com/libssh2/libssh2
+[submodule "vendor/http_parser"]
+	path = vendor/http_parser
+	url = https://github.com/nodejs/http-parser
