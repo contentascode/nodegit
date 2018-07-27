@@ -52,8 +52,7 @@ addons:
     packages:
       - build-essential
       - libssl-dev
-      - gcc-4.9-multilib
-      - g++-4.9-multilib
+      - g++-multilib
       - lcov
 
 before_install:
@@ -64,8 +63,8 @@ before_install:
 
   - if [ -z "$TRAVIS_TAG" ] && [ "$EXTENDED_TESTING" == "true" ]; then
       export GYP_DEFINES="coverage=1 use_obsolete_asm=true";
-      export CC=/usr/bin/gcc-4.9;
-      export CXX=/usr/bin/g++-4.9;
+      export CC=/usr/bin/gcc-5;
+      export CXX=/usr/bin/g++-5;
       export npm_config_clang=0;
       wget http://downloads.sourceforge.net/ltp/lcov-1.10.tar.gz;
       tar xvfz lcov-1.10.tar.gz;
@@ -88,10 +87,9 @@ before_script:
   - git config --global user.email johndoe@example.com
 
 script:
+    travis_retry npm test;
     if [ -z "$TRAVIS_TAG" ] && [ "$EXTENDED_TESTING" == "true" ]; then
-      travis_retry npm test && npm run cov && npm run coveralls;
-    else
-      travis_retry npm test;
+      travis_retry npm run cov && npm run coveralls;
     fi
 
 after_success:
