@@ -1,11 +1,11 @@
 # appveyor file
-# http://www.appveyor.com/docs/appveyor-yml
+# https://www.appveyor.com/docs/appveyor-yml/
 
 image: Visual Studio 2017
 
 platform:
-  - x86
   - x64
+  - x86
 
 # build version format
 version: "{build}"
@@ -13,7 +13,7 @@ version: "{build}"
 # Set a known clone folder
 clone_folder: c:\projects\nodegit
 
-# fix lineendings in Windows
+# fix line endings in Windows
 init:
   - git config --global core.autocrlf input
   - git config --global user.name "John Doe"
