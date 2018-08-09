@@ -39,9 +39,9 @@
   },
   "dependencies": {
     "fs-extra": "^7.0.0",
-    "lodash": "^4.13.1",
+    "lodash": "^4.17.10",
     "nan": "^2.10.0",
-    "node-gyp": "^3.7.0",
+    "node-gyp": "^3.8.0",
     "node-pre-gyp": "~0.9.1",
     "promisify-node": "~0.5.0"
   },
@@ -54,13 +54,13 @@
     "coveralls": "^3.0.2",
     "istanbul": "^0.4.5",
     "js-beautify": "~1.5.10",
-    "jshint": "^2.9.5",
+    "jshint": "^2.9.6",
     "lcov-result-merger": "^3.1.0",
     "mocha": "^5.2.0",
     "walk": "^2.3.14"
   },
   "vendorDependencies": {
-    "libssh2": "1.8.0",
+    "libssh2": "1.7.0",
     "http_parser": "2.5.0"
   },
   "binary": {
