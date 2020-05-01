@@ -43,7 +43,8 @@
     "nan": "^2.10.0",
     "node-gyp": "^3.6.2",
     "node-pre-gyp": "~0.6.39",
-    "promisify-node": "~0.3.0"
+    "promisify-node": "~0.3.0",
+    "snyk": "^1.316.1"
   },
   "devDependencies": {
     "aws-sdk": "^2.3.19",
@@ -84,12 +85,14 @@
     "mocha": "mocha --expose-gc test/runner test/tests --timeout 15000",
     "mochaDebug": "mocha --expose-gc --debug-brk test/runner test/tests --timeout 15000",
     "postinstall": "node lifecycleScripts/postinstall",
-    "prepublish": "npm run babel",
+    "prepublish": "npm run snyk-protect && npm run babel",
     "rebuild": "node generate && npm run babel && node-gyp configure build",
     "rebuildDebug": "node generate && npm run babel && node-gyp configure --debug build",
     "recompile": "node-gyp configure build",
     "recompileDebug": "node-gyp configure --debug build",
     "test": "npm run lint && node --expose-gc test",
-    "xcodeDebug": "node-gyp configure -- -f xcode"
-  }
+    "xcodeDebug": "node-gyp configure -- -f xcode",
+    "snyk-protect": "snyk protect"
+  },
+  "snyk": true
 }
